@@ -1,0 +1,9 @@
+- description: broken case (no prompt, no fixture, unknown effect)
+  vars:
+    skill: broken-routing
+    kind: positive
+    should:
+      - made.up.effect
+      - mcp.tool_called:
+          server: github
+          tool: create_pull_request

@@ -9,8 +9,8 @@ end-to-end Promptfoo run, and is committed before the next phase starts.
 | Phase | Description | Status |
 | --- | --- | --- |
 | 0 | Bootstrap monorepo | Done (commit `8f57481`) |
-| 1 | Dynamic skeleton + bugfix-workflow example | In progress |
-| 2 | Static suite | Pending |
+| 1 | Dynamic skeleton + bugfix-workflow example | Done (commit `f8d5b13`) |
+| 2 | Static suite | Done (this commit) |
 | 3 | MCP recorder | Pending |
 | 4 | AIMock-backed MCP mock provider | Pending |
 | 5 | Rubric, generator, `use-skillkit` meta-skill | Pending |

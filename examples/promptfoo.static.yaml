@@ -1,0 +1,57 @@
+description: SkillKit static checks
+
+prompts:
+  - "{{skillPath}}"
+
+providers:
+  - id: file://./skillkit/provider-static.js
+    label: skillkit-static
+
+defaultTest:
+  options:
+    runSerially: true
+
+tests:
+  - description: bugfix-workflow static checks
+    vars:
+      skillPath: ./skills/bugfix-workflow
+      testsGlob: ./tests/bugfix-workflow.yaml
+      evidenceSources:
+        - claude-stream-json
+    assert:
+      - type: javascript
+        metric: routing_metadata
+        value: file://./skillkit/assertions-static/routing-metadata.js
+      - type: javascript
+        metric: scenario_validity
+        value: file://./skillkit/assertions-static/scenario-validity.js
+      - type: javascript
+        metric: negative_coverage
+        value: file://./skillkit/assertions-static/negative-coverage.js
+      - type: javascript
+        metric: mcp_evidence
+        value: file://./skillkit/assertions-static/mcp-evidence.js
+      - type: javascript
+        metric: context_economy
+        value: file://./skillkit/assertions-static/context-economy.js
+      - type: javascript
+        metric: instruction_calibration
+        value: file://./skillkit/assertions-static/instruction-calibration.js
+      - type: javascript
+        metric: executable_helper
+        value: file://./skillkit/assertions-static/executable-helper.js
+
+  - description: _broken-routing static checks must fail (negative meta-test)
+    vars:
+      skillPath: ./skills/_broken-routing
+      testsGlob: ./tests/_broken/**/*.yaml
+    assert:
+      # The broken skill SHOULD fail routing-metadata + scenario-validity.
+      # The expect-*-fails shims wrap each underlying check and pass when it
+      # reports a failure (i.e. the static suite caught the broken skill).
+      - type: javascript
+        metric: routing_metadata_caught
+        value: file://./skillkit/assertions-static/expect-routing-fails.js
+      - type: javascript
+        metric: scenario_validity_caught
+        value: file://./skillkit/assertions-static/expect-scenario-fails.js

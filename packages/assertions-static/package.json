@@ -1,0 +1,53 @@
+{
+  "name": "@skillkit/assertions-static",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./routing-metadata": {
+      "types": "./dist/routing-metadata.d.ts",
+      "import": "./dist/routing-metadata.js"
+    },
+    "./scenario-validity": {
+      "types": "./dist/scenario-validity.d.ts",
+      "import": "./dist/scenario-validity.js"
+    },
+    "./negative-coverage": {
+      "types": "./dist/negative-coverage.d.ts",
+      "import": "./dist/negative-coverage.js"
+    },
+    "./mcp-evidence": {
+      "types": "./dist/mcp-evidence.d.ts",
+      "import": "./dist/mcp-evidence.js"
+    },
+    "./context-economy": {
+      "types": "./dist/context-economy.d.ts",
+      "import": "./dist/context-economy.js"
+    },
+    "./instruction-calibration": {
+      "types": "./dist/instruction-calibration.d.ts",
+      "import": "./dist/instruction-calibration.js"
+    },
+    "./executable-helper": {
+      "types": "./dist/executable-helper.d.ts",
+      "import": "./dist/executable-helper.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@skillkit/promptfoo-provider-static": "0.1.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.2"
+  }
+}
