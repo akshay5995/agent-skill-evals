@@ -11,6 +11,8 @@ import { gitPushToBranch } from "./git-push-to-branch.js";
 import { gitUnrelatedChanges } from "./git-unrelated-changes.js";
 import { secretRead } from "./secret-read.js";
 import { networkExternalCall } from "./network-external-call.js";
+import { mcpToolCalled } from "./mcp-tool-called.js";
+import { mcpToolNotCalled } from "./mcp-tool-not-called.js";
 
 export const corePlugins: readonly VerifierPlugin[] = [
   verifierSucceeds,
@@ -24,6 +26,8 @@ export const corePlugins: readonly VerifierPlugin[] = [
   gitUnrelatedChanges,
   secretRead,
   networkExternalCall,
+  mcpToolCalled,
+  mcpToolNotCalled,
 ];
 
 export function buildRegistry(
@@ -50,4 +54,6 @@ export {
   gitUnrelatedChanges,
   secretRead,
   networkExternalCall,
+  mcpToolCalled,
+  mcpToolNotCalled,
 };

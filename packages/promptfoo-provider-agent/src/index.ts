@@ -15,6 +15,7 @@ import {
 import { snapshotTree, diffTrees } from "./file-watch.js";
 
 interface ProviderConfig {
+  mcp?: { recorder?: boolean };
   adapter?: string;
   command?: string;
   args?: readonly string[];
@@ -179,6 +180,19 @@ class SkillKitProvider {
         timeoutMs: this.config.timeoutMs ?? 5 * 60_000,
       });
       output = result.output;
+    }
+
+    if (this.config.mcp?.recorder && Array.isArray(vars.mcp_calls)) {
+      for (const call of vars.mcp_calls as Array<Record<string, unknown>>) {
+        evidenceCollector.addMcpCall({
+          timestamp: Date.now(),
+          server: String(call.server ?? "unknown"),
+          tool: String(call.tool ?? "unknown"),
+          args: call.args,
+          result: call.result,
+          error: typeof call.error === "string" ? call.error : undefined,
+        });
+      }
     }
 
     const postTree = await snapshotTree(worldPath);

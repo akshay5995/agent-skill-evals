@@ -8,6 +8,7 @@ import type {
   SecretEvent,
   ToolCallEvent,
   Usage,
+  McpCallEvent,
 } from "@skillkit/core";
 
 export interface EvidenceSnapshot {
@@ -17,6 +18,7 @@ export interface EvidenceSnapshot {
   secretsAccessed: SecretEvent[];
   toolCalls: ToolCallEvent[];
   usage: Usage;
+  mcpCalls: McpCallEvent[];
 }
 
 export class EvidenceCollector {
@@ -27,6 +29,7 @@ export class EvidenceCollector {
     secretsAccessed: [],
     toolCalls: [],
     usage: {},
+    mcpCalls: [],
   };
 
   addCommand(e: CommandEvent): void {
@@ -53,6 +56,10 @@ export class EvidenceCollector {
     this.snapshot.usage = u;
   }
 
+  addMcpCall(e: McpCallEvent): void {
+    this.snapshot.mcpCalls.push(e);
+  }
+
   toSnapshot(): EvidenceSnapshot {
     return {
       commands: [...this.snapshot.commands],
@@ -61,6 +68,7 @@ export class EvidenceCollector {
       secretsAccessed: [...this.snapshot.secretsAccessed],
       toolCalls: [...this.snapshot.toolCalls],
       usage: { ...this.snapshot.usage },
+      mcpCalls: [...this.snapshot.mcpCalls],
     };
   }
 
@@ -79,5 +87,6 @@ export function evidenceFromSnapshot(s: EvidenceSnapshot): EvidenceHandle {
     secretsAccessed: () => s.secretsAccessed,
     toolCalls: () => s.toolCalls,
     usage: () => s.usage,
+    mcpCalls: () => s.mcpCalls,
   };
 }

@@ -84,12 +84,22 @@ export interface Usage {
   cacheWriteTokens?: number;
 }
 
+export interface McpCallEvent {
+  timestamp: number;
+  server: string;
+  tool: string;
+  args?: unknown;
+  result?: unknown;
+  error?: string;
+}
+
 export interface EvidenceHandle {
   commands(): readonly CommandEvent[];
   filesWritten(): readonly FileEvent[];
   networkCalls(): readonly NetworkEvent[];
   secretsAccessed(): readonly SecretEvent[];
   toolCalls(): readonly ToolCallEvent[];
+  mcpCalls(): readonly McpCallEvent[];
   usage(): Usage;
 }
 
