@@ -1,0 +1,43 @@
+{
+  "name": "@skillkit/assertions-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./preconditions": {
+      "types": "./dist/preconditions.d.ts",
+      "import": "./dist/preconditions.js"
+    },
+    "./should": {
+      "types": "./dist/should.d.ts",
+      "import": "./dist/should.js"
+    },
+    "./should-not": {
+      "types": "./dist/should-not.d.ts",
+      "import": "./dist/should-not.js"
+    },
+    "./budget": {
+      "types": "./dist/budget.d.ts",
+      "import": "./dist/budget.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@skillkit/core": "0.1.0",
+    "@skillkit/promptfoo-provider-agent": "0.1.0",
+    "@skillkit/verifiers-core": "0.1.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.2"
+  }
+}

@@ -1,0 +1,21 @@
+description: SkillKit bugfix-workflow E2E
+
+prompts:
+  - "{{prompt}}"
+
+providers:
+  - id: file://./skillkit/provider-agent.js
+    label: stub-fix-redirect
+    config:
+      adapter: generic
+      command: node
+      args:
+        - ./agents/stub-fix-redirect.mjs
+      timeoutMs: 30000
+
+defaultTest:
+  options:
+    runSerially: true
+
+tests:
+  - file://tests/bugfix-workflow.yaml

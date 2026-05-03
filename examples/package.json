@@ -4,7 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "eval": "echo \"examples eval wired in Phase 1\" && exit 0",
+    "eval": "promptfoo eval -c promptfooconfig.yaml --no-cache",
     "eval:static": "echo \"examples eval:static wired in Phase 2\" && exit 0"
+  },
+  "dependencies": {
+    "@skillkit/assertions-core": "0.1.0",
+    "@skillkit/promptfoo-provider-agent": "0.1.0",
+    "@skillkit/scoring": "0.1.0"
+  },
+  "devDependencies": {
+    "promptfoo": "^0.107.0"
   }
 }
