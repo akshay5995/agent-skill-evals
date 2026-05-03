@@ -1,0 +1,10 @@
+{
+  "name": "@skillkit/examples",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "eval": "echo \"examples eval wired in Phase 1\" && exit 0",
+    "eval:static": "echo \"examples eval:static wired in Phase 2\" && exit 0"
+  }
+}
