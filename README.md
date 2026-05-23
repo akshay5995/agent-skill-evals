@@ -4,20 +4,24 @@
 
 # Agent Skill Evals
 
-Agent Skill Evals helps you test agent skills with [Promptfoo](https://www.promptfoo.dev/).
+Agent Skill Evals helps you test reusable agent skills with [Promptfoo](https://www.promptfoo.dev/).
 
-Use it to check three things:
+It has two jobs:
 
-- Is the skill clear enough for an agent to use at the right time?
-- Are the tests for the skill valid?
-- Does the skill work on a real sample project?
+1. Check the skill setup before an agent runs.
+2. Check recorded evidence after an agent runs.
 
-Agent Skill Evals gives you one package: `agent-skill-evals`.
+That split matters because a weak test can make a weak skill look good, and an agent's final message is not proof that the right work happened.
 
-It can:
+## The Model
 
-1. Check a `SKILL.md` file and its tests before you run an agent.
-2. Copy a sample project, run an agent in the copy, save evidence, and check what changed.
+Use **Skill Checks** to review a `SKILL.md` file and its tests before runtime.
+
+Use **agent tests** to copy a sample project, run an agent in the copy, save evidence, and assert what happened.
+
+Evidence can include changed files, command results, recorded tool calls, loaded skills, output, usage, and run details.
+
+Promptfoo stays the runner. Agent Skill Evals adds Promptfoo providers, assertions, examples, and evidence checks. You keep running `promptfoo eval`.
 
 ## Install
 
@@ -25,11 +29,9 @@ It can:
 pnpm add -D promptfoo agent-skill-evals
 ```
 
-Run Agent Skill Evals from normal [Promptfoo](https://www.promptfoo.dev/) configs. Promptfoo is the eval runner; Agent Skill Evals adds skill-focused providers, assertions, examples, and evidence checks. You do not need a new runner.
+## Minimal Setup
 
-## Add Agent Skill Evals To Promptfoo
-
-Create a `agent-skill-evals/` folder in your project with these three files:
+Create loader files so Promptfoo can import the package subpaths:
 
 ```js
 // agent-skill-evals/agent.js
@@ -47,79 +49,20 @@ export { default } from "agent-skill-evals/assertions";
 export * from "agent-skill-evals/assertions";
 ```
 
-## 1. Check The Skill And Its Tests
+Most projects run both checks:
 
-Use `skill.checks` to review a skill before an agent runs. It catches common problems like unclear activation text, missing files, invalid tests, missing fixtures, missing verifier scripts, and unsafe file changes.
-
-```yaml
-description: Skill checks
-
-prompts:
-  - "skill-check"
-
-providers:
-  - id: file://./agent-skill-evals/skill-checks.js
-
-tests:
-  - description: bugfix skill checks
-    vars:
-      skillPath: ./skills/bugfix-workflow
-      testsGlob: ./tests/bugfix-workflow.yaml
-    assert:
-      - type: javascript
-        metric: skill.checks
-        value: file://./agent-skill-evals/assertions.js
-        config:
-          metric: skill.checks
+```bash
+promptfoo eval -c promptfoo.skill-checks.yaml
+promptfoo eval -c promptfoo.codex.yaml
 ```
-
-## 2. Test The Skill On A Sample Project
-
-This test copies `./fixtures/login-bug`, runs the agent in the copy, then checks the result.
-
-```yaml
-- description: fixes login redirect locally
-  vars:
-    prompt: Fix the login redirect bug.
-    fixture: ./fixtures/login-bug
-    preconditions:
-      - verifier.fails:
-          run: ./verify_login_redirect.sh
-    should:
-      - verifier.succeeds:
-          run: ./verify_login_redirect.sh
-      - file.contains:
-          path: app.js
-          text: /dashboard
-    should_not:
-      - file.changes_outside_scope:
-          scope:
-            - app.js
-  assert:
-    - type: javascript
-      metric: skill.test
-      value: file://./agent-skill-evals/assertions.js
-      config:
-        metric: skill.test
-```
-
-This test checks that:
-
-1. The login project starts broken.
-2. The check script fails before the agent runs.
-3. The agent is asked to fix the bug.
-4. The check script passes after the agent runs.
-5. Only `app.js` changed.
-
-Agent Skill Evals records evidence during the run: changed files, command results, recorded tool calls, final output, and run details. `skill.test` checks that evidence.
 
 ## Learn More
 
 - [Getting Started](https://akshay5995.github.io/agent-skill-evals/guide/getting-started)
-- [Promptfoo Setup](https://akshay5995.github.io/agent-skill-evals/guide/promptfoo-setup)
 - [Core Concepts](https://akshay5995.github.io/agent-skill-evals/guide/core-concepts)
+- [Promptfoo Setup](https://akshay5995.github.io/agent-skill-evals/guide/promptfoo-setup)
 - [Runtime Checks](https://akshay5995.github.io/agent-skill-evals/guide/runtime-checks)
-- [Brand Deck Example](https://akshay5995.github.io/agent-skill-evals/examples/brand-deck-skill)
-- [Bugfix Example](https://akshay5995.github.io/agent-skill-evals/examples/bugfix-skill)
+- [Skill Loading](https://akshay5995.github.io/agent-skill-evals/guide/routing-evals)
 - [Metrics](https://akshay5995.github.io/agent-skill-evals/guide/metrics)
 - [Package Map](https://akshay5995.github.io/agent-skill-evals/guide/package-map)
+- [Promptfoo Docs](https://www.promptfoo.dev/docs/intro/)
