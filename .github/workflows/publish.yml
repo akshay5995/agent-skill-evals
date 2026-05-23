@@ -8,9 +8,10 @@ name: Publish
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
-  verify:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,17 +47,9 @@ jobs:
       - name: Package smoke
         run: pnpm run release:package-smoke
 
-      # Publishing is intentionally paused. Re-enable when the registry decision is ready.
-      # For npm provenance, add `id-token: write` to this job's permissions.
-      # For GitHub Packages, add `packages: write` and setup-node with
-      # `registry-url: "https://npm.pkg.github.com"` and an npm scope.
-      #
-      # - name: Publish packages to npm
-      #   run: pnpm -r --filter './packages/*' publish --access public --no-git-checks --provenance
-      #   env:
-      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      #
-      # - name: Publish packages to GitHub Packages
-      #   run: pnpm -r --filter './packages/*' publish --no-git-checks
-      #   env:
-      #     NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Use npm 11
+        run: npm install -g npm@11
+
+      - name: Stage package on npm
+        working-directory: packages/promptfoo
+        run: npm stage publish --access public
