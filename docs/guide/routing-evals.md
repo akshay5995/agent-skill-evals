@@ -1,4 +1,8 @@
-# Skill Loading Evals
+# Skill Loading
+
+Skill Loading checks prove which skill entered an agent run.
+
+They exist because task success alone does not prove the agent used the expected skill. A routing eval should prove the skill context first, then check the task result.
 
 The simple model is:
 

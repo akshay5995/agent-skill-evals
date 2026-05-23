@@ -1,6 +1,10 @@
 # Metrics
 
-Promptfoo uses `metric` names to decide which Agent Skill Evals check to run.
+Metrics are the names Promptfoo passes to the Agent Skill Evals assertion file.
+
+They answer: which check should this assertion run?
+
+They exist because Promptfoo has one JavaScript assertion entrypoint, while Agent Skill Evals has several skill-specific checks. The `metric` value selects the check.
 
 Most users start with two names:
 

@@ -3,14 +3,16 @@
 Agent Skill Evals runs through normal [Promptfoo](https://www.promptfoo.dev/) config files.
 
 ::: tip New to Promptfoo?
-Promptfoo is the host runner. It reads these config files, runs the providers, and calls the JavaScript assertions. Agent Skill Evals gives Promptfoo the agent provider, skill-check provider, and evidence assertions.
+Promptfoo is the host runner. It reads these config files, runs the providers, and calls the JavaScript assertions. Agent Skill Evals gives Promptfoo the agent provider, skill-check provider, and evidence assertions. Use the [Promptfoo configuration guide](https://www.promptfoo.dev/docs/configuration/guide/) for the full Promptfoo config model.
 :::
 
 First add the three files from [Getting Started](/guide/getting-started). Then add one config for Skill Checks and one config for agent tests.
 
 ## Skill Checks Config
 
-Use this when you want to check a `SKILL.md` file before running an agent:
+Skill Checks are the setup check.
+
+Use this config when you want Promptfoo to load the Agent Skill Evals skill-check provider and check a `SKILL.md` file before running an agent:
 
 ```yaml
 description: Skill checks
@@ -42,7 +44,9 @@ promptfoo eval -c promptfoo.skill-checks.yaml
 
 ## Agent Test Config
 
-Use this when you want Agent Skill Evals to copy a sample project, run an agent, and check the result:
+Agent tests are the behavior check.
+
+Use this config when you want Agent Skill Evals to copy a sample project, run an agent, record evidence, and check the result:
 
 ```yaml
 description: Skill tests

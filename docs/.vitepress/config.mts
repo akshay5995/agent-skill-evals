@@ -12,14 +12,17 @@ export default defineConfig({
   outDir: ".vitepress/dist",
   head: [["link", { rel: "icon", href: `${base}favicon.ico` }]],
   themeConfig: {
-    logo: `${base}assets/agent-skill-evals-logo.png`,
+    logo: {
+      src: `${base}assets/agent-skill-evals-nav-logo.png`,
+      alt: "Agent Skill Evals",
+    },
     search: {
       provider: "local",
     },
     nav: [
-      { text: "Guide", link: "/guide/getting-started" },
+      { text: "Start", link: "/guide/getting-started" },
       { text: "Examples", link: "/examples/brand-deck-skill" },
-      { text: "Runtime Checks", link: "/guide/runtime-checks" },
+      { text: "Reference", link: "/guide/runtime-checks" },
     ],
     sidebar: [
       {
@@ -27,11 +30,16 @@ export default defineConfig({
         items: [
           { text: "Overview", link: "/" },
           { text: "Getting Started", link: "/guide/getting-started" },
-          { text: "Promptfoo Setup", link: "/guide/promptfoo-setup" },
           { text: "Core Concepts", link: "/guide/core-concepts" },
-          { text: "Metrics", link: "/guide/metrics" },
+          { text: "Promptfoo Setup", link: "/guide/promptfoo-setup" },
+        ],
+      },
+      {
+        text: "Reference",
+        items: [
           { text: "Runtime Checks", link: "/guide/runtime-checks" },
-          { text: "Skill Loading Evals", link: "/guide/routing-evals" },
+          { text: "Skill Loading", link: "/guide/routing-evals" },
+          { text: "Metrics", link: "/guide/metrics" },
           { text: "Package Map", link: "/guide/package-map" },
         ],
       },

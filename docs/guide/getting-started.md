@@ -2,7 +2,9 @@
 
 This guide sets up the smallest useful Agent Skill Evals project.
 
-You will:
+Agent Skill Evals tests reusable agent skills through Promptfoo. Promptfoo runs the eval. Agent Skill Evals provides the skill-aware providers and assertions.
+
+The path is:
 
 1. Install Agent Skill Evals and [Promptfoo](https://www.promptfoo.dev/).
 2. Add three small files that let Promptfoo load Agent Skill Evals.
@@ -16,11 +18,10 @@ pnpm add -D promptfoo agent-skill-evals
 ```
 
 ::: tip Promptfoo is the test runner
-[Promptfoo](https://www.promptfoo.dev/) is the eval framework that reads the YAML configs and runs `promptfoo eval`. Agent Skill Evals adds skill-focused providers and assertions that Promptfoo can load.
+[Promptfoo](https://www.promptfoo.dev/) is the eval framework that reads the YAML configs and runs `promptfoo eval`. Agent Skill Evals adds skill-focused providers and assertions that Promptfoo can load. Keep the [Promptfoo configuration guide](https://www.promptfoo.dev/docs/configuration/guide/) open if you want the full host-runner reference.
 :::
 
-Agent Skill Evals runs inside Promptfoo. Keep using `promptfoo eval`; the Agent Skill Evals files
-below give Promptfoo the providers and assertions it needs.
+Agent Skill Evals runs inside Promptfoo. Keep using `promptfoo eval`; the files below give Promptfoo the providers and assertions it needs.
 
 ## Add The Agent Skill Evals Files
 
@@ -42,22 +43,26 @@ export { default } from "agent-skill-evals/assertions";
 export * from "agent-skill-evals/assertions";
 ```
 
-## Choose A Test Type
+## Run Two Kinds Of Tests
 
-Use **Skill Checks** to review a `SKILL.md` file and its Promptfoo tests before an agent runs. They are fast and catch setup problems.
+Use **Skill Checks** before an agent runs.
 
-Use **agent tests** when you want proof that the skill works on a sample project. Agent Skill Evals copies the sample project first, so the original stays clean.
+They exist because a broken skill file or a weak test can make the runtime result misleading. They check the `SKILL.md` file, referenced files, fixtures, verifier scripts, and safety coverage.
 
-Agent tests save evidence: changed files, command results, recorded tool calls, final output, and run details. `skill.test` checks that evidence.
+Use **agent tests** after the setup is ready.
 
-Most projects run both:
+They exist because task success should be proven by evidence, not by the agent saying it is done. Agent Skill Evals copies the sample project, runs the agent in the copy, records evidence, and `skill.test` checks that evidence.
+
+Most projects run both, in this order:
 
 ```bash
 promptfoo eval -c promptfoo.skill-checks.yaml
 promptfoo eval -c promptfoo.codex.yaml
 ```
 
-## Check A Skill And Its Tests
+## 1. Check A Skill And Its Tests
+
+Skill Checks answer: is this skill ready to test with an agent?
 
 Create a Promptfoo config like this:
 
@@ -85,9 +90,11 @@ tests:
 
 `skillPath` points to the skill folder. `testsGlob` points to the tests for that skill.
 
-This check catches problems before runtime: unclear activation text, missing referenced files, invalid checks, missing fixtures, missing verifier scripts, and missing safety coverage.
+This catches setup problems before runtime: unclear activation text, missing referenced files, invalid checks, missing fixtures, missing verifier scripts, and missing safety coverage.
 
-## Run An Agent Test
+## 2. Run An Agent Test
+
+Agent tests answer: did the skill produce the expected result in a copied sample project?
 
 Each agent test usually has:
 
@@ -129,8 +136,8 @@ After the run, Agent Skill Evals saves evidence from the copy. The `should` chec
 
 ## Next
 
-- [Promptfoo Setup](/guide/promptfoo-setup)
 - [Core Concepts](/guide/core-concepts)
+- [Promptfoo Setup](/guide/promptfoo-setup)
 - [Runtime Checks](/guide/runtime-checks)
 - [Brand Deck Example](/examples/brand-deck-skill)
 - [Bugfix Example](/examples/bugfix-skill)

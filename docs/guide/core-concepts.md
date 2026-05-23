@@ -2,28 +2,23 @@
 
 Agent Skill Evals helps you trust an agent skill before other people depend on it.
 
-It does three things:
+It teaches one testing model:
 
-- Checks whether a skill file is clear and complete.
-- Checks whether the tests for that skill are valid.
-- Checks whether an agent using that skill did the right work in a copied sample project.
+1. Check the skill setup.
+2. Run the agent against a copied sample project.
+3. Check the recorded evidence.
 
-The basic model is:
+That model exists because agent output is not enough. A useful eval should check the skill, the test, the files, the tool calls, the commands, and the final result.
 
-1. Start with a known sample project.
-2. Give the agent a realistic task.
-3. Record what the agent changed, ran, and reported.
-4. Check that evidence with assertions.
-
-Routing is a separate concern from task completion. `skill.activation` checks
-whether the skill's routing metadata is clear. A behavioral routing eval should
-prove which skills entered the agent run before it checks the final task. Use
-[Skill Context Checks](/guide/runtime-checks#skill-context-checks) for that
-evidence.
+Agent Skill Evals keeps Promptfoo as the host runner. See the [Promptfoo docs](https://www.promptfoo.dev/docs/intro/) for Promptfoo concepts such as configs, providers, prompts, tests, and assertions.
 
 ## Skill Checks
 
 Skill Checks run before any agent runs.
+
+They answer: is this skill and its test setup ready for a real run?
+
+They exist because a runtime eval is only useful if the skill and tests are valid first.
 
 They read your `SKILL.md` file and the Promptfoo tests for that skill.
 
@@ -40,15 +35,21 @@ Use `skill.checks` for the normal full check.
 
 Skill Checks do not prove the agent can finish the task. They prove the skill and its tests are ready to run.
 
+`skill.activation` is one Skill Check. It checks whether the skill describes when it should be used. It does not prove that a real agent loaded the skill.
+
 ## Sample Projects
 
-The `fixture` field points to a sample project or folder.
+Sample projects are small projects that represent the work the skill should handle.
 
-Agent Skill Evals copies that folder before the agent runs. The agent works in the copy, so your original sample stays unchanged.
+They exist so the agent can do real work without touching your original files.
+
+The `fixture` field points to a sample project or folder. Agent Skill Evals copies that folder before the agent runs. The agent works in the copy, so your original sample stays unchanged.
 
 ## Agent Tests With `skill.test`
 
 Use `skill.test` to check the work after an agent runs.
+
+It answers: did the agent do the right work, and avoid the wrong work?
 
 Agent Skill Evals records evidence during the run, then `skill.test` checks that evidence.
 
@@ -116,7 +117,9 @@ Most projects can keep the defaults.
 
 Evidence is the record of what happened during an agent test.
 
-It is what turns an agent run from "the agent said it worked" into "the files, commands, and tool calls show what happened."
+It exists because the agent's final message is not proof.
+
+Evidence turns "the agent said it worked" into "the files, commands, and tool calls show what happened."
 
 It can include:
 
@@ -130,3 +133,13 @@ It can include:
 `skill.test` reads this evidence when it checks `should` and `should_not`.
 
 Agent Skill Evals can only check what the evidence can show. File checks use the copied sample project. Tool checks use recorded tool calls. They do not prove that nothing happened outside those records.
+
+## Skill Loading
+
+Routing is separate from task completion.
+
+Skill loading checks answer: did the expected skill enter the run, and did unrelated skills stay out?
+
+For routing evals, first prove which skills entered the run, then check whether the task succeeded. Use `skill.loaded` in an agent test when the adapter can record native skill loading or MCP skill resource/tool usage.
+
+See [Skill Loading](/guide/routing-evals) for the full shape.

@@ -2,7 +2,11 @@
 
 Runtime Checks are the checklist items inside `preconditions`, `should`, and `should_not`.
 
-They check the copied sample project and the run datan Agent Skill Evals saved.
+They answer: what should the copied sample project and recorded run evidence prove?
+
+They exist because agent tests should check observable facts: files, commands, tool calls, loaded skills, output, usage, and run details.
+
+They check the copied sample project and the run data Agent Skill Evals saved.
 
 You can write a check in any of these forms:
 

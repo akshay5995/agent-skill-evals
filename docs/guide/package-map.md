@@ -2,11 +2,13 @@
 
 Agent Skill Evals exposes one package: `agent-skill-evals`.
 
-It has three entry points:
+It has three public entry points:
 
 - `agent-skill-evals/skill-checks`: checks `SKILL.md` files and their tests.
 - `agent-skill-evals/agent`: runs an agent in a copied sample project and saves evidence.
 - `agent-skill-evals/assertions`: provides `skill.checks` and `skill.test`.
+
+There is no root import from `agent-skill-evals`.
 
 ## Agent Test Flow
 
