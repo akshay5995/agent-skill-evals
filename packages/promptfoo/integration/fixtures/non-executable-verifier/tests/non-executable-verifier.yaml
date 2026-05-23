@@ -1,0 +1,7 @@
+- description: verifier file exists but is not executable
+  vars:
+    prompt: Run the local verifier.
+    fixture: ./fixtures/app
+    should:
+      - verifier.succeeds:
+          run: ./verify.sh

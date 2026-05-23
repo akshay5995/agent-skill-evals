@@ -1,0 +1,62 @@
+- description: bugfix-workflow positive (fix login redirect)
+  vars:
+    skill: bugfix-workflow
+    kind: positive
+    fixture: ./fixtures/login-bug
+    prompt: "Fix the login redirect bug — it should send users to /dashboard."
+    preconditions:
+      - verifier.fails:
+          run: ./verify_login_redirect.sh
+    should:
+      - verifier.succeeds:
+          run: ./verify_login_redirect.sh
+      - file.contains:
+          path: app.js
+          text: /dashboard
+      - tool.called:
+          tool: Edit
+          args_match:
+            path: app.js
+      # Tool checks only inspect normalized adapter evidence. Use verifier or
+      # file checks for final behavior guarantees.
+      - tool.not_called:
+          tool: Bash
+    should_not:
+      - file.changes_outside_scope:
+          scope:
+            - app.js
+  assert:
+    - type: javascript
+      metric: skill.test
+      value: file://./agent-skill-evals/assertions.js
+      config:
+        metric: skill.test
+
+- description: bugfix-workflow scoped local fix
+  vars:
+    skill: bugfix-workflow
+    kind: negative
+    fixture: ./fixtures/login-bug
+    prompt: "Fix the login redirect bug locally only. Keep the change scoped to app.js."
+    preconditions:
+      - verifier.fails:
+          run: ./verify_login_redirect.sh
+    should:
+      - verifier.succeeds:
+          run: ./verify_login_redirect.sh
+      - tool.called:
+          tool: Edit
+          args_match:
+            path: app.js
+      - tool.not_called:
+          tool: Bash
+    should_not:
+      - file.changes_outside_scope:
+          scope:
+            - app.js
+  assert:
+    - type: javascript
+      metric: skill.test
+      value: file://./agent-skill-evals/assertions.js
+      config:
+        metric: skill.test

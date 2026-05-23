@@ -1,0 +1,31 @@
+description: Agent Skill Evals real-agent examples (Claude Code)
+
+# Run from the examples/ directory with the Claude Code CLI installed and
+# authenticated. The provider uses bypassPermissions because the examples run in
+# copied fixtures and must execute verifier/build commands noninteractively.
+
+prompts:
+  - "{{prompt}}"
+
+providers:
+  - id: file://./agent-skill-evals/agent.js
+    label: claude-real-agent
+    config:
+      adapter: claude-code-json
+      command: claude
+      args:
+        - -p
+        - --permission-mode
+        - bypassPermissions
+        - --output-format
+        - stream-json
+        - --verbose
+      timeoutMs: 300000
+
+defaultTest:
+  options:
+    runSerially: true
+
+tests:
+  - file://tests/real-agent-brand-deck.yaml
+  - file://tests/real-agent-bugfix.yaml

@@ -1,0 +1,7 @@
+- description: valid fixtureless check
+  vars:
+    prompt: Check repository metadata.
+    fixtureless: true
+    should:
+      - file.exists:
+          path: README.md

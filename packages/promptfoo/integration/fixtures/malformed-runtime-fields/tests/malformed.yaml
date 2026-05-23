@@ -1,0 +1,18 @@
+- description: should is not an array
+  vars:
+    prompt: Fix the local issue.
+    fixtureless: true
+    should:
+      file.exists:
+        path: README.md
+
+- description: should_not contains an invalid entry
+  vars:
+    prompt: Fix the local issue.
+    fixtureless: true
+    should_not:
+      - 42
+
+- description: missing fixture and checks
+  vars:
+    prompt: Fix the local issue.

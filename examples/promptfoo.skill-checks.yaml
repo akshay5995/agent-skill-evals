@@ -1,0 +1,39 @@
+description: Agent Skill Evals static checks
+
+prompts:
+  - "static-check"
+
+providers:
+  - id: file://./agent-skill-evals/skill-checks.js
+    label: agent-skill-evals-skill-checks
+
+defaultTest:
+  options:
+    runSerially: true
+
+tests:
+  - description: brand-deck static checks
+    vars:
+      skillPath: ./skills/brand-deck
+      testsGlob: ./tests/brand-deck.yaml
+    assert:
+      - type: javascript
+        metric: skill.checks
+        value: file://./agent-skill-evals/assertions.js
+        config:
+          metric: skill.checks
+          agentSkillEvals:
+            maxSkillLines: 200
+
+  - description: bugfix-workflow static checks
+    vars:
+      skillPath: ./skills/bugfix-workflow
+      testsGlob: ./tests/bugfix-workflow.yaml
+    assert:
+      - type: javascript
+        metric: skill.checks
+        value: file://./agent-skill-evals/assertions.js
+        config:
+          metric: skill.checks
+          agentSkillEvals:
+            maxSkillLines: 200

@@ -1,0 +1,36 @@
+description: Agent Skill Evals real-agent examples (Codex)
+
+# Run from the examples/ directory with the Codex CLI installed and
+# authenticated. The provider runs Codex in workspace-write sandbox mode with
+# user config and rules disabled so local plugins do not change the example.
+
+prompts:
+  - "{{prompt}}"
+
+providers:
+  - id: file://./agent-skill-evals/agent.js
+    label: codex-real-agent
+    config:
+      adapter: codex-json
+      command: codex
+      args:
+        - --ask-for-approval
+        - never
+        - exec
+        - --json
+        - --sandbox
+        - workspace-write
+        - --skip-git-repo-check
+        - --ephemeral
+        - --ignore-user-config
+        - --ignore-rules
+        - "-"
+      timeoutMs: 300000
+
+defaultTest:
+  options:
+    runSerially: true
+
+tests:
+  - file://tests/real-agent-brand-deck.yaml
+  - file://tests/real-agent-bugfix.yaml

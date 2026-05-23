@@ -1,0 +1,7 @@
+- description: fixtureless repository-level check
+  vars:
+    prompt: Check that the repository has package metadata.
+    fixtureless: true
+    should:
+      - file.exists:
+          path: package.json

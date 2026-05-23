@@ -1,0 +1,19 @@
+- description: loads only the MCP-served brand-deck skill
+  vars:
+    skill: brand-deck
+    fixture: ./fixtures/mcp-skill-loading
+    prompt: |
+      Create a short brand deck outline for the product launch request in request.md.
+      Use the matching MCP skill tool when one is available.
+    should:
+      - skill.loaded:
+          should_include:
+            - brand-deck
+          should_exclude:
+            - bugfix-workflow
+  assert:
+    - type: javascript
+      metric: skill.test
+      value: file://./agent-skill-evals/assertions.js
+      config:
+        metric: skill.test

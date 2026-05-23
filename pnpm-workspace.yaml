@@ -1,0 +1,12 @@
+packages:
+  - "docs"
+  - "packages/*"
+  - "examples"
+allowBuilds:
+  '@playwright/browser-chromium': true
+  '@swc/core': true
+  better-sqlite3: true
+  esbuild: true
+  onnxruntime-node: true
+  protobufjs: true
+  sharp: true

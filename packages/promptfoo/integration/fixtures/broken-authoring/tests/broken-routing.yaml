@@ -1,0 +1,12 @@
+- description: broken case
+  vars:
+    prompt: Fix the bug
+    fixture: ./fixtures/missing-bug
+    should:
+      - made.up.effect
+      - verifier.succeeds:
+          run: ./missing.sh
+    should_not:
+      - code.no_pattern:
+          glob: "**/*.js"
+          pattern: TODO

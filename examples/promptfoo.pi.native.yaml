@@ -1,0 +1,29 @@
+description: Agent Skill Evals native skill loading example (Pi)
+
+# Pi exposes deterministic native skill routing with --no-skills plus one or
+# more --skill paths. Agent Skill Evals records that invocation as skill.loaded evidence.
+
+prompts:
+  - "{{prompt}}"
+
+providers:
+  - id: file://./agent-skill-evals/agent.js
+    label: pi-native-skill-agent
+    config:
+      adapter: pi-json
+      command: pi
+      args:
+        - --mode
+        - json
+        - --no-session
+        - --no-skills
+        - --skill
+        - ./skills/brand-deck
+      timeoutMs: 300000
+
+defaultTest:
+  options:
+    runSerially: true
+
+tests:
+  - file://tests/native-skill-loading.yaml

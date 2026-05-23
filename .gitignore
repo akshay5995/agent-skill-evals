@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.promptfoo/
+*.log
+.DS_Store
+coverage/
+*.tsbuildinfo
+.env
+.env.local
+.venv/
+__pycache__/
+.skillkit/
+.pnpm-store
+**/.vitepress/cache/
+docs/.vitepress/dist/

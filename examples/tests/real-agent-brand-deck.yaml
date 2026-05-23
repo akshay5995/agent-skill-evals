@@ -1,0 +1,36 @@
+- description: real agent creates branded launch deck locally
+  vars:
+    skill: brand-deck
+    kind: positive
+    fixture: ./fixtures/brand-deck
+    prompt: "Use the launch brief in this folder to create a branded PowerPoint for the Nimbus spring review."
+    preconditions:
+      - verifier.fails:
+          run: ./verify_brand_deck.cjs
+    should:
+      - verifier.succeeds:
+          run: ./verify_brand_deck.cjs
+      - file.created:
+          path: launch-deck.pptx
+      - file.created:
+          path: deck.js
+      - file.contains:
+          path: deck.js
+          text: pptxgenjs
+      - file.contains:
+          path: deck.js
+          text: 1B4D89
+  assert:
+    - type: javascript
+      metric: skill.test
+      value: file://./agent-skill-evals/assertions.js
+      config:
+        metric: skill.test
+    - type: javascript
+      metric: skill.budget
+      value: file://./agent-skill-evals/assertions.js
+      config:
+        metric: skill.budget
+        agentSkillEvals:
+          maxTotalTokens: 300000
+          maxCompletionTokens: 15000

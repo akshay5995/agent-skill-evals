@@ -1,0 +1,56 @@
+{
+  "name": "agent-skill-evals",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./agent": {
+      "types": "./dist/agent/index.d.mts",
+      "import": "./dist/agent/index.mjs"
+    },
+    "./skill-checks": {
+      "types": "./dist/skill-checks/index.d.mts",
+      "import": "./dist/skill-checks/index.mjs"
+    },
+    "./assertions": {
+      "types": "./dist/assertions/index.d.mts",
+      "import": "./dist/assertions/index.mjs"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@effect/platform": "^0.96.1",
+    "@effect/platform-node": "^0.106.0",
+    "effect": "^3.21.2",
+    "yaml": "^2.6.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2"
+  },
+  "description": "Promptfoo-native core package for evaluating reusable agent skills.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/akshay5995/agent-skill-evals.git",
+    "directory": "packages/promptfoo"
+  },
+  "homepage": "https://akshay5995.github.io/agent-skill-evals/",
+  "bugs": {
+    "url": "https://github.com/akshay5995/agent-skill-evals/issues"
+  },
+  "keywords": [
+    "agent-skills",
+    "evals",
+    "promptfoo",
+    "testing"
+  ],
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
