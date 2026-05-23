@@ -13,7 +13,7 @@ export default defineConfig({
   head: [["link", { rel: "icon", href: `${base}favicon.ico` }]],
   themeConfig: {
     logo: {
-      src: `${base}assets/agent-skill-evals-nav-logo.png`,
+      src: "/assets/agent-skill-evals-nav-logo.png",
       alt: "Agent Skill Evals",
     },
     search: {
