@@ -2,7 +2,7 @@
 
 This guide sets up the smallest useful Agent Skill Evals project.
 
-Agent Skill Evals tests reusable agent skills through Promptfoo. Promptfoo runs the eval. Agent Skill Evals provides the skill-aware providers and assertions.
+Agent Skill Evals tests reusable agent skills through Promptfoo. Promptfoo runs the eval. Agent Skill Evals provides the skill-specific checks.
 
 The path is:
 
@@ -18,10 +18,10 @@ pnpm add -D promptfoo agent-skill-evals
 ```
 
 ::: tip Promptfoo is the test runner
-[Promptfoo](https://www.promptfoo.dev/) is the eval framework that reads the YAML configs and runs `promptfoo eval`. Agent Skill Evals adds skill-focused providers and assertions that Promptfoo can load. Keep the [Promptfoo configuration guide](https://www.promptfoo.dev/docs/configuration/guide/) open if you want the full host-runner reference.
+[Promptfoo](https://www.promptfoo.dev/) is the eval framework that reads the YAML configs and runs `promptfoo eval`. Agent Skill Evals adds skill-focused checks that Promptfoo can load. Keep the [Promptfoo configuration guide](https://www.promptfoo.dev/docs/configuration/guide/) open if you want the full Promptfoo reference.
 :::
 
-Agent Skill Evals runs inside Promptfoo. Keep using `promptfoo eval`; the files below give Promptfoo the providers and assertions it needs.
+Agent Skill Evals runs inside Promptfoo. Keep using `promptfoo eval`; the files below let Promptfoo load Agent Skill Evals.
 
 ## Add The Agent Skill Evals Files
 
@@ -47,7 +47,7 @@ export * from "agent-skill-evals/assertions";
 
 Use **Skill Checks** before an agent runs.
 
-They exist because a broken skill file or a weak test can make the runtime result misleading. They check the `SKILL.md` file, referenced files, fixtures, verifier scripts, and safety coverage.
+They exist because a broken skill file or a weak test can make the agent result misleading. They check the `SKILL.md` file, referenced files, sample projects, verifier scripts, and safety coverage.
 
 Use **agent tests** after the setup is ready.
 
@@ -90,7 +90,7 @@ tests:
 
 `skillPath` points to the skill folder. `testsGlob` points to the tests for that skill.
 
-This catches setup problems before runtime: unclear activation text, missing referenced files, invalid checks, missing fixtures, missing verifier scripts, and missing safety coverage.
+This catches setup problems before the agent runs: unclear activation text, missing referenced files, invalid checks, missing sample projects, missing verifier scripts, and missing safety coverage.
 
 ## 2. Run An Agent Test
 
@@ -99,7 +99,7 @@ Agent tests answer: did the skill produce the expected result in a copied sample
 Each agent test usually has:
 
 - `prompt`: what the agent should do.
-- `fixture`: the sample project to copy.
+- `fixture`: the sample project to copy. The field is named `fixture` because that is the test variable Agent Skill Evals reads.
 - `preconditions`: checks that run before the agent.
 - `should`: checks that must pass after the agent.
 - `should_not`: things that must not happen.
@@ -130,7 +130,7 @@ Each agent test usually has:
         metric: skill.test
 ```
 
-Agent Skill Evals never edits the original `fixture` folder. It copies the folder and checks the copy.
+Agent Skill Evals never edits the original sample project. It copies the folder and checks the copy.
 
 After the run, Agent Skill Evals saves evidence from the copy. The `should` checks describe what the evidence must show. The `should_not` checks describe what the evidence must not show.
 

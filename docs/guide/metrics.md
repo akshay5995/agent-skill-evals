@@ -1,10 +1,10 @@
 # Metrics
 
-Metrics are the names Promptfoo passes to the Agent Skill Evals assertion file.
+Metrics are the names you put in Promptfoo assertions.
 
 They answer: which check should this assertion run?
 
-They exist because Promptfoo has one JavaScript assertion entrypoint, while Agent Skill Evals has several skill-specific checks. The `metric` value selects the check.
+The `metric` value tells Agent Skill Evals which skill-specific check to run.
 
 Most users start with two names:
 
@@ -40,7 +40,7 @@ should:
 
 ## `skill.budget`
 
-Use this in real-agent tests when the provider returns token usage.
+Use this in real-agent tests when the run records token usage.
 
 ```yaml
 assert:
@@ -75,7 +75,7 @@ assert:
 
 `skill.activation` checks whether a skill describes when it should be used. It does not prove that the skill was loaded into a real agent run.
 
-Use the runtime check `skill.loaded` inside `skill.test` when your native adapter or MCP server records loaded skill evidence. See [Skill Context Checks](/guide/runtime-checks#skill-context-checks).
+Use the runtime check `skill.loaded` inside `skill.test` when the run records which skill was loaded. See [Skill Context Checks](/guide/runtime-checks#skill-context-checks).
 
 ## Full Metric List
 

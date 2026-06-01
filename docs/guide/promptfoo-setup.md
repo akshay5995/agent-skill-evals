@@ -3,7 +3,10 @@
 Agent Skill Evals runs through normal [Promptfoo](https://www.promptfoo.dev/) config files.
 
 ::: tip New to Promptfoo?
-Promptfoo is the host runner. It reads these config files, runs the providers, and calls the JavaScript assertions. Agent Skill Evals gives Promptfoo the agent provider, skill-check provider, and evidence assertions. Use the [Promptfoo configuration guide](https://www.promptfoo.dev/docs/configuration/guide/) for the full Promptfoo config model.
+Promptfoo reads these config files and runs `promptfoo eval`. Agent Skill Evals
+adds the skill checks and evidence checks used in those configs. Use the
+[Promptfoo configuration guide](https://www.promptfoo.dev/docs/configuration/guide/)
+for Promptfoo's own config reference.
 :::
 
 First add the three files from [Getting Started](/guide/getting-started). Then add one config for Skill Checks and one config for agent tests.
@@ -12,7 +15,7 @@ First add the three files from [Getting Started](/guide/getting-started). Then a
 
 Skill Checks are the setup check.
 
-Use this config when you want Promptfoo to load the Agent Skill Evals skill-check provider and check a `SKILL.md` file before running an agent:
+Use this config when you want to check a `SKILL.md` file before running an agent:
 
 ```yaml
 description: Skill checks
@@ -46,7 +49,8 @@ promptfoo eval -c promptfoo.skill-checks.yaml
 
 Agent tests are the behavior check.
 
-Use this config when you want Agent Skill Evals to copy a sample project, run an agent, record evidence, and check the result:
+Use this config when you want Agent Skill Evals to copy a sample project, run an
+agent, record evidence, and check the result:
 
 ```yaml
 description: Skill tests
@@ -92,17 +96,15 @@ pnpm run eval:pi
 `pnpm run eval:real` runs the installed real-agent CLIs and skips CLIs that are
 not present on the machine.
 
-The examples also include skill-loading evals for routing evidence:
+The examples also include skill-loading checks:
 
 ```bash
 pnpm --filter @agent-skill-evals/examples mcp:setup
 pnpm run eval:routing
 ```
 
-`eval:routing` runs the Claude HTTP MCP example, the Codex HTTP MCP example,
-and the Pi native example. The MCP evals start a local FastMCP HTTP server with
-`uv`. They check `skill.loaded` evidence before you add normal task-success
-checks.
+`eval:routing` checks that the expected skill loaded before the task result is
+checked. Use it when you need routing confidence.
 
 ## If A Run Hangs
 

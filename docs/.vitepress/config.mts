@@ -40,7 +40,7 @@ export default defineConfig({
           { text: "Runtime Checks", link: "/guide/runtime-checks" },
           { text: "Skill Loading", link: "/guide/routing-evals" },
           { text: "Metrics", link: "/guide/metrics" },
-          { text: "Package Map", link: "/guide/package-map" },
+          { text: "Package Reference", link: "/guide/package-map" },
         ],
       },
       {

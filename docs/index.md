@@ -5,7 +5,7 @@ title: Agent Skill Evals
 hero:
   name: Agent Skill Evals
   text: Test agent skills with Promptfoo.
-  tagline: Check the skill definition, run the agent on a copied sample project, and assert against recorded evidence.
+  tagline: Check the skill, run the agent on a copied sample project, and prove the result with evidence.
   actions:
     - theme: brand
       text: Get Started
@@ -33,7 +33,7 @@ Agent Skill Evals is for teams that write reusable skills for agents.
 Use it when a skill can edit files, run commands, call tools, or make changes you want to check before trusting it.
 
 ::: tip Promptfoo is the test runner
-[Promptfoo](https://www.promptfoo.dev/) is an open-source eval framework. Agent Skill Evals plugs into normal Promptfoo configs, so you keep running `promptfoo eval` and add skill-specific providers, assertions, examples, and evidence checks. Use the [Promptfoo docs](https://www.promptfoo.dev/docs/intro/) for Promptfoo's own config, provider, and assertion reference.
+[Promptfoo](https://www.promptfoo.dev/) is an open-source eval framework. Agent Skill Evals plugs into normal Promptfoo configs, so you keep running `promptfoo eval` and add skill-specific checks. Use the [Promptfoo docs](https://www.promptfoo.dev/docs/intro/) for Promptfoo's own config reference.
 :::
 
 ## How It Works
@@ -80,7 +80,7 @@ should_not:
 Start with [Getting Started](/guide/getting-started), then read [Core Concepts](/guide/core-concepts).
 
 Use [Set Up Tests For An Existing Skill](/examples/meta-skill) when you already
-have a skill and want an agent to set up the Promptfoo configs, runtime tests,
+have a skill and want an agent to set up the Promptfoo configs, agent tests,
 verifier scripts, and evidence checks for you.
 
-Use [Runtime Checks](/guide/runtime-checks), [Skill Loading](/guide/routing-evals), [Metrics](/guide/metrics), [Package Map](/guide/package-map), and the [Promptfoo docs](https://www.promptfoo.dev/docs/intro/) as reference pages.
+Use [Runtime Checks](/guide/runtime-checks), [Skill Loading](/guide/routing-evals), [Metrics](/guide/metrics), [Package Reference](/guide/package-map), and the [Promptfoo docs](https://www.promptfoo.dev/docs/intro/) as reference pages.
