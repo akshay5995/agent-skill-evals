@@ -24,6 +24,6 @@
     "pptxgenjs": "^4.0.1"
   },
   "devDependencies": {
-    "promptfoo": "^0.121.11"
+    "promptfoo": "^0.121.13"
   }
 }
