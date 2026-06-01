@@ -8,6 +8,17 @@
 
 Agent Skill Evals helps you test reusable agent skills with [Promptfoo](https://www.promptfoo.dev/).
 
+Already have a skill and want tests for it? Install the helper skill, then ask
+your agent to set up Agent Skill Evals for your existing skill.
+
+```bash
+npx skills add akshay5995/agent-skill-evals --skill agent-eval-skills
+```
+
+For example: "Use `agent-eval-skills` to add tests for
+`skills/release-notes`." The helper guides the agent to add Promptfoo configs,
+runtime tests, verifier scripts, and evidence checks.
+
 It has two jobs:
 
 1. Check the skill setup before an agent runs.
@@ -58,14 +69,6 @@ promptfoo eval -c promptfoo.skill-checks.yaml
 promptfoo eval -c promptfoo.codex.yaml
 ```
 
-This repo also includes `skills/agent-eval-skills`: a skill that helps an agent
-add Agent Skill Evals coverage to another existing skill by separating example
-fixtures from Promptfoo test packs.
-
-```bash
-npx skills add akshay5995/agent-skill-evals --skill agent-eval-skills
-```
-
 ## Learn More
 
 - [Getting Started](https://akshay5995.github.io/agent-skill-evals/guide/getting-started)
@@ -73,7 +76,7 @@ npx skills add akshay5995/agent-skill-evals --skill agent-eval-skills
 - [Promptfoo Setup](https://akshay5995.github.io/agent-skill-evals/guide/promptfoo-setup)
 - [Runtime Checks](https://akshay5995.github.io/agent-skill-evals/guide/runtime-checks)
 - [Skill Loading](https://akshay5995.github.io/agent-skill-evals/guide/routing-evals)
-- [Agent Eval Skills Meta Skill](https://akshay5995.github.io/agent-skill-evals/examples/meta-skill)
+- [Set Up Tests For An Existing Skill](https://akshay5995.github.io/agent-skill-evals/examples/meta-skill)
 - [Metrics](https://akshay5995.github.io/agent-skill-evals/guide/metrics)
 - [Package Map](https://akshay5995.github.io/agent-skill-evals/guide/package-map)
 - [Promptfoo Docs](https://www.promptfoo.dev/docs/intro/)
