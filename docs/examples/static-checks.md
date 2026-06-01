@@ -9,7 +9,7 @@ They answer two questions:
 1. Is the skill clear enough for the agent to use at the right time?
 2. Are the tests strong enough to trust?
 
-That means Agent Skill Evals checks the `SKILL.md` file, the Promptfoo test files, referenced fixtures, and verifier scripts.
+That means Agent Skill Evals checks the `SKILL.md` file, the Promptfoo test files, referenced sample projects, and verifier scripts.
 
 It can also catch missing safety coverage. For example, if tests use `file.changes_outside_scope`, Agent Skill Evals expects the skill to explain safe editing and expects the tests to include forbidden behavior.
 
@@ -43,7 +43,7 @@ tests:
 
 `skillPath` points to the skill folder. `testsGlob` points to the Promptfoo tests for that skill.
 
-Skill Checks do not run the agent. They check the setup before runtime so broken tests do not make a broken skill look good.
+Skill Checks do not run the agent. They check the setup first so broken tests do not make a broken skill look good.
 
 Use `skill.checks` for the normal full report. Use a focused metric when you only want one area:
 

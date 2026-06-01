@@ -1,28 +1,28 @@
-# Package Map
+# Package Reference
 
 Agent Skill Evals exposes one package: `agent-skill-evals`.
 
-It has three public entry points:
+Use these three import paths:
 
 - `agent-skill-evals/skill-checks`: checks `SKILL.md` files and their tests.
 - `agent-skill-evals/agent`: runs an agent in a copied sample project and saves evidence.
 - `agent-skill-evals/assertions`: provides `skill.checks` and `skill.test`.
 
-There is no root import from `agent-skill-evals`.
+The package does not expose a root import.
 
-## Agent Test Flow
+## How Agent Tests Run
 
-1. Promptfoo calls `agent-skill-evals/agent.js`.
-2. Agent Skill Evals copies `vars.fixture` to a temporary folder.
+1. Promptfoo loads `agent-skill-evals/agent.js`.
+2. Agent Skill Evals copies the sample project to a temporary folder.
 3. Agent Skill Evals runs `preconditions` in the copy.
 4. If they pass, Agent Skill Evals runs the agent in the copy.
 5. Agent Skill Evals records evidence: changed files, command results, tool calls, output, and run details.
 6. Promptfoo calls `skill.test`.
 7. `skill.test` checks `should` and `should_not` against the evidence.
 
-## Skill Check Flow
+## How Skill Checks Run
 
-1. Promptfoo calls `agent-skill-evals/skill-checks.js`.
+1. Promptfoo loads `agent-skill-evals/skill-checks.js`.
 2. Agent Skill Evals reads the `SKILL.md` file from `vars.skillPath`.
 3. Agent Skill Evals reads the tests from `vars.testsGlob`.
 4. Agent Skill Evals checks the skill text, referenced files, tests, sample projects, and verifier scripts.

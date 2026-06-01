@@ -2,11 +2,11 @@
 
 Runtime Checks are the checklist items inside `preconditions`, `should`, and `should_not`.
 
-They answer: what should the copied sample project and recorded run evidence prove?
+They answer: what should the copied sample project and recorded evidence prove?
 
 They exist because agent tests should check observable facts: files, commands, tool calls, loaded skills, output, usage, and run details.
 
-They check the copied sample project and the run data Agent Skill Evals saved.
+They check the copied sample project and the evidence Agent Skill Evals saved.
 
 You can write a check in any of these forms:
 
@@ -183,9 +183,10 @@ See [Tool Checks](/examples/tool-checks) for more examples.
 
 ## Skill Context Checks
 
-Use skill context checks when Agent Skill Evals can prove which skills entered the agent run.
-For routing tests, keep the check in `should` and use both `should_include`
-and `should_exclude` so the assertion reads as one expected skill context.
+Use skill loading checks when Agent Skill Evals can prove which skills entered
+the agent run. Keep the check in `should` and use both `should_include` and
+`should_exclude` so the test says which skill should be present and which should
+stay out.
 
 ### `skill.loaded`
 
@@ -204,9 +205,13 @@ should:
 `should_not` works like other positive runtime checks, but `should_exclude`
 is usually clearer when you want to prove a nearby skill was not loaded.
 
-For MCP delivery, Agent Skill Evals maps skill-loader tools and `skill://.../SKILL.md` resource reads from supported adapters into the same loaded-skill evidence. Raw tool calls remain in `evidence.json` for debugging.
+For MCP delivery, Agent Skill Evals can map skill-loader tools and skill resource
+reads into the same loaded-skill evidence. Raw tool calls remain in
+`evidence.json` for debugging.
 
-If your harness records skill loading differently, configure the mapping on the Agent Skill Evals provider:
+Most users do not need custom mapping. If your setup records skill loading with
+different tool names or resource URLs, configure `skillEvidence` in your agent
+config:
 
 ```yaml
 providers:

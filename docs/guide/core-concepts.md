@@ -10,7 +10,7 @@ It teaches one testing model:
 
 That model exists because agent output is not enough. A useful eval should check the skill, the test, the files, the tool calls, the commands, and the final result.
 
-Agent Skill Evals keeps Promptfoo as the host runner. See the [Promptfoo docs](https://www.promptfoo.dev/docs/intro/) for Promptfoo concepts such as configs, providers, prompts, tests, and assertions.
+Agent Skill Evals keeps Promptfoo as the tool you run. See the [Promptfoo docs](https://www.promptfoo.dev/docs/intro/) for Promptfoo config reference.
 
 ## Skill Checks
 
@@ -18,7 +18,7 @@ Skill Checks run before any agent runs.
 
 They answer: is this skill and its test setup ready for a real run?
 
-They exist because a runtime eval is only useful if the skill and tests are valid first.
+They exist because an agent eval is only useful if the skill and tests are valid first.
 
 They read your `SKILL.md` file and the Promptfoo tests for that skill.
 
@@ -126,8 +126,8 @@ It can include:
 - The agent's final message.
 - Changed files.
 - Command results.
-- Tool calls recorded by the agent adapter.
-- Skills loaded by native adapters or MCP resource reads when Agent Skill Evals can prove them.
+- Tool calls recorded during the run.
+- Skills loaded during the run, when Agent Skill Evals can prove them.
 - Usage and run details.
 
 `skill.test` reads this evidence when it checks `should` and `should_not`.
@@ -140,6 +140,7 @@ Routing is separate from task completion.
 
 Skill loading checks answer: did the expected skill enter the run, and did unrelated skills stay out?
 
-For routing evals, first prove which skills entered the run, then check whether the task succeeded. Use `skill.loaded` in an agent test when the adapter can record native skill loading or MCP skill resource/tool usage.
+First prove which skills entered the run, then check whether the task succeeded.
+Use `skill.loaded` in an agent test when the run records skill-loading evidence.
 
 See [Skill Loading](/guide/routing-evals) for the full shape.

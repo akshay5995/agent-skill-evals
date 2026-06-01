@@ -8,6 +8,17 @@
 
 Agent Skill Evals helps you test reusable agent skills with [Promptfoo](https://www.promptfoo.dev/).
 
+Already have a skill and want tests for it? Install the helper skill, then ask
+your agent to set up Agent Skill Evals for your existing skill.
+
+```bash
+npx skills add akshay5995/agent-skill-evals --skill agent-eval-skills
+```
+
+For example: "Use `agent-eval-skills` to add tests for
+`skills/release-notes`." The helper guides the agent to add Promptfoo configs,
+agent tests, verifier scripts, and evidence checks.
+
 It has two jobs:
 
 1. Check the skill setup before an agent runs.
@@ -17,13 +28,13 @@ That split matters because a weak test can make a weak skill look good, and an a
 
 ## The Model
 
-Use **Skill Checks** to review a `SKILL.md` file and its tests before runtime.
+Use **Skill Checks** to review a `SKILL.md` file and its tests before an agent runs.
 
 Use **agent tests** to copy a sample project, run an agent in the copy, save evidence, and assert what happened.
 
 Evidence can include changed files, command results, recorded tool calls, loaded skills, output, usage, and run details.
 
-Promptfoo stays the runner. Agent Skill Evals adds Promptfoo providers, assertions, examples, and evidence checks. You keep running `promptfoo eval`.
+Promptfoo stays the runner. Agent Skill Evals adds the skill checks and evidence checks. You keep running `promptfoo eval`.
 
 ## Install
 
@@ -33,7 +44,7 @@ pnpm add -D promptfoo agent-skill-evals
 
 ## Minimal Setup
 
-Create loader files so Promptfoo can import the package subpaths:
+Create three small loader files so Promptfoo can load Agent Skill Evals:
 
 ```js
 // agent-skill-evals/agent.js
@@ -58,14 +69,6 @@ promptfoo eval -c promptfoo.skill-checks.yaml
 promptfoo eval -c promptfoo.codex.yaml
 ```
 
-This repo also includes `skills/agent-eval-skills`: a skill that helps an agent
-add Agent Skill Evals coverage to another existing skill by separating example
-fixtures from Promptfoo test packs.
-
-```bash
-npx skills add akshay5995/agent-skill-evals --skill agent-eval-skills
-```
-
 ## Learn More
 
 - [Getting Started](https://akshay5995.github.io/agent-skill-evals/guide/getting-started)
@@ -73,7 +76,7 @@ npx skills add akshay5995/agent-skill-evals --skill agent-eval-skills
 - [Promptfoo Setup](https://akshay5995.github.io/agent-skill-evals/guide/promptfoo-setup)
 - [Runtime Checks](https://akshay5995.github.io/agent-skill-evals/guide/runtime-checks)
 - [Skill Loading](https://akshay5995.github.io/agent-skill-evals/guide/routing-evals)
-- [Agent Eval Skills Meta Skill](https://akshay5995.github.io/agent-skill-evals/examples/meta-skill)
+- [Set Up Tests For An Existing Skill](https://akshay5995.github.io/agent-skill-evals/examples/meta-skill)
 - [Metrics](https://akshay5995.github.io/agent-skill-evals/guide/metrics)
-- [Package Map](https://akshay5995.github.io/agent-skill-evals/guide/package-map)
+- [Package Reference](https://akshay5995.github.io/agent-skill-evals/guide/package-map)
 - [Promptfoo Docs](https://www.promptfoo.dev/docs/intro/)

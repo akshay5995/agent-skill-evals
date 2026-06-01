@@ -40,7 +40,7 @@ export default defineConfig({
           { text: "Runtime Checks", link: "/guide/runtime-checks" },
           { text: "Skill Loading", link: "/guide/routing-evals" },
           { text: "Metrics", link: "/guide/metrics" },
-          { text: "Package Map", link: "/guide/package-map" },
+          { text: "Package Reference", link: "/guide/package-map" },
         ],
       },
       {
@@ -48,7 +48,7 @@ export default defineConfig({
         items: [
           { text: "Brand Deck Skill", link: "/examples/brand-deck-skill" },
           { text: "Bugfix Skill", link: "/examples/bugfix-skill" },
-          { text: "Meta Skill", link: "/examples/meta-skill" },
+          { text: "Set Up Tests", link: "/examples/meta-skill" },
           { text: "Skill Checks", link: "/examples/static-checks" },
           { text: "File and Code Checks", link: "/examples/file-code-checks" },
           { text: "Tool Checks", link: "/examples/tool-checks" },
