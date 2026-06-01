@@ -41,7 +41,7 @@ const server = spawn(
     env: {
       ...process.env,
       AGENT_SKILL_EVALS_EXAMPLES_DIR: examplesDir,
-      AGENT_SKILL_EVALS_MCP_SKILLS: process.env.AGENT_SKILL_EVALS_MCP_SKILLS ?? "brand-deck,bugfix-workflow",
+      AGENT_SKILL_EVALS_MCP_SKILLS: process.env.AGENT_SKILL_EVALS_MCP_SKILLS ?? "brand-deck,bugfix-workflow,agent-eval-skills",
       AGENT_SKILL_EVALS_MCP_SERVER: process.env.AGENT_SKILL_EVALS_MCP_SERVER ?? "agent_skill_evals",
     },
     stdio: ["ignore", "pipe", "pipe"],

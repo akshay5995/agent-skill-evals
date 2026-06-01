@@ -48,6 +48,7 @@ export default defineConfig({
         items: [
           { text: "Brand Deck Skill", link: "/examples/brand-deck-skill" },
           { text: "Bugfix Skill", link: "/examples/bugfix-skill" },
+          { text: "Meta Skill", link: "/examples/meta-skill" },
           { text: "Skill Checks", link: "/examples/static-checks" },
           { text: "File and Code Checks", link: "/examples/file-code-checks" },
           { text: "Tool Checks", link: "/examples/tool-checks" },

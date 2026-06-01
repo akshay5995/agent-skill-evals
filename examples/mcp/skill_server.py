@@ -7,6 +7,7 @@ from fastmcp.server.transforms import ResourcesAsTools
 
 
 EXAMPLES_DIR = Path(os.environ.get("AGENT_SKILL_EVALS_EXAMPLES_DIR", os.getcwd()))
+REPO_ROOT = EXAMPLES_DIR.parent
 SERVER_NAME = os.environ.get("AGENT_SKILL_EVALS_MCP_SERVER", "agent_skill_evals")
 
 SKILLS = {
@@ -27,24 +28,41 @@ SKILLS = {
             "in an existing application with a verifier."
         ),
     },
+    "agent-eval-skills": {
+        "path": "../skills/agent-eval-skills",
+        "tool": "load_agent_eval_skills_skill",
+        "description": (
+            "Load the agent-eval-skills meta skill for adding Promptfoo-native "
+            "Agent Skill Evals coverage to an existing agent skill."
+        ),
+    },
 }
 
 mcp = FastMCP(name=SERVER_NAME)
 
 
 def selected_skills() -> list[str]:
-    raw = os.environ.get("AGENT_SKILL_EVALS_MCP_SKILLS", "brand-deck,bugfix-workflow")
+    raw = os.environ.get(
+        "AGENT_SKILL_EVALS_MCP_SKILLS",
+        "brand-deck,bugfix-workflow,agent-eval-skills",
+    )
     return [skill.strip() for skill in raw.split(",") if skill.strip() in SKILLS]
 
 
-def register_skill_provider(skill: str) -> None:
+def skill_path(skill: str) -> Path:
     spec = SKILLS[skill]
-    mcp.add_provider(SkillProvider(EXAMPLES_DIR / spec["path"]))
+    path = Path(spec["path"])
+    if path.parts[:1] == ("..",):
+        return REPO_ROOT / Path(*path.parts[1:])
+    return EXAMPLES_DIR / path
+
+
+def register_skill_provider(skill: str) -> None:
+    mcp.add_provider(SkillProvider(skill_path(skill)))
 
 
 def skill_markdown(skill: str) -> str:
-    spec = SKILLS[skill]
-    return (EXAMPLES_DIR / spec["path"] / "SKILL.md").read_text()
+    return (skill_path(skill) / "SKILL.md").read_text()
 
 
 def register_skill_loader(skill: str) -> None:

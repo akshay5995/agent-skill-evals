@@ -17,7 +17,7 @@ providers:
         - --ask-for-approval
         - never
         - --sandbox
-        - read-only
+        - workspace-write
         - exec
         - --json
         - --skip-git-repo-check
@@ -37,3 +37,4 @@ defaultTest:
 
 tests:
   - file://tests/mcp-skill-loading-codex.yaml
+  - file://tests/agent-eval-skills-codex.yaml

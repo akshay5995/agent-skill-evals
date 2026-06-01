@@ -1,0 +1,18 @@
+{
+  "product": "Nimbus Notes",
+  "releaseDate": "2026-05-20",
+  "changes": [
+    {
+      "type": "added",
+      "summary": "Shared workspaces can now pin a launch checklist."
+    },
+    {
+      "type": "changed",
+      "summary": "Exported PDFs now preserve heading links."
+    },
+    {
+      "type": "fixed",
+      "summary": "Resolved a sign-in redirect loop after password reset."
+    }
+  ]
+}
