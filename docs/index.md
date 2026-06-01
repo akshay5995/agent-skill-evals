@@ -77,4 +77,10 @@ should_not:
         - launch-deck.pptx
 ```
 
-Start with [Getting Started](/guide/getting-started), then read [Core Concepts](/guide/core-concepts). Use [Runtime Checks](/guide/runtime-checks), [Skill Loading](/guide/routing-evals), [Metrics](/guide/metrics), [Package Map](/guide/package-map), and the [Promptfoo docs](https://www.promptfoo.dev/docs/intro/) as reference pages.
+Start with [Getting Started](/guide/getting-started), then read [Core Concepts](/guide/core-concepts).
+
+Use the [Agent Eval Skills Meta Skill](/examples/meta-skill) when you want an
+agent to add this setup to an existing skill. That page also shows the
+difference between example fixtures and Promptfoo test packs.
+
+Use [Runtime Checks](/guide/runtime-checks), [Skill Loading](/guide/routing-evals), [Metrics](/guide/metrics), [Package Map](/guide/package-map), and the [Promptfoo docs](https://www.promptfoo.dev/docs/intro/) as reference pages.

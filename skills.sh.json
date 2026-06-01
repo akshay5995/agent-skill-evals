@@ -1,0 +1,13 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "Agent Skill Evals",
+      "description": "Skills for adding Promptfoo-native eval coverage to reusable agent skills.",
+      "skills": [
+        "agent-eval-skills"
+      ]
+    }
+  ]
+}

@@ -37,3 +37,16 @@ tests:
           metric: skill.checks
           agentSkillEvals:
             maxSkillLines: 200
+
+  - description: agent-eval-skills static checks
+    vars:
+      skillPath: ../skills/agent-eval-skills
+      testsGlob: ./tests/agent-eval-skills.yaml
+    assert:
+      - type: javascript
+        metric: skill.checks
+        value: file://./agent-skill-evals/assertions.js
+        config:
+          metric: skill.checks
+          agentSkillEvals:
+            maxSkillLines: 200

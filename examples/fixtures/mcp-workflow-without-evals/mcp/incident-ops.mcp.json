@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "incident_ops": {
+      "url": "${INCIDENT_OPS_MCP_URL}"
+    }
+  }
+}

@@ -11,6 +11,7 @@
             - brand-deck
           should_exclude:
             - bugfix-workflow
+            - agent-eval-skills
   assert:
     - type: javascript
       metric: skill.test
