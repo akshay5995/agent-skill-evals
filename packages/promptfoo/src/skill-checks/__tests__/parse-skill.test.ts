@@ -24,6 +24,8 @@ beforeAll(() => {
       "See [verify](./scripts/verify.sh) and `./scripts/missing.sh`.",
       "",
       "Also link to [external](https://example.com).",
+      "",
+      "Declare the `skill.test` metric once.",
     ].join("\n"),
   );
 });
@@ -33,7 +35,7 @@ afterAll(() => {
 });
 
 describe("parseSkillMd", () => {
-  it("parses frontmatter, body, and references", async () => {
+  it("parses metadata and reports local references", async () => {
     const skill = await parseSkillMd(join(dir, "SKILL.md"));
     expect(skill.frontmatter.name).toBe("example");
     expect(skill.frontmatter.description).toMatch(/Use when/);
@@ -41,16 +43,10 @@ describe("parseSkillMd", () => {
     expect(skill.references).toContain("./scripts/missing.sh");
     // External URLs are filtered
     expect(skill.references.find((r) => r.includes("example.com"))).toBeUndefined();
-  });
-
-  it("flags missing references", async () => {
-    const skill = await parseSkillMd(join(dir, "SKILL.md"));
+    // Bare dotted identifiers (metric names, not paths) are not references
+    expect(skill.references).not.toContain("skill.test");
     expect(skill.missingReferences).toContain("./scripts/missing.sh");
     expect(skill.missingReferences).not.toContain("./scripts/verify.sh");
-  });
-
-  it("counts SKILL.md lines", async () => {
-    const skill = await parseSkillMd(join(dir, "SKILL.md"));
     expect(skill.totalLines).toBeGreaterThan(8);
   });
 });

@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="320" height="96" viewBox="0 0 320 96" role="img" aria-label="Nimbus Analytics">
-  <rect width="320" height="96" rx="12" fill="#1B4D89"/>
-  <circle cx="54" cy="48" r="24" fill="#F2C94C"/>
-  <path d="M42 49c8-18 25-18 36 0-12-6-24-6-36 0z" fill="#F6F8FB"/>
-  <text x="96" y="58" fill="#F6F8FB" font-family="Arial, sans-serif" font-size="28" font-weight="700">Nimbus</text>
-</svg>

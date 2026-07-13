@@ -2,10 +2,12 @@ import type {
   CommandEvent,
   FileEvent,
   SkillLoadEvent,
+  SkillAvailableEvent,
+  RuntimeIdentity,
   ToolCallEvent,
+  TurnRecord,
   Usage,
-} from "./evidence-types.js";
-import type * as Effect from "effect/Effect";
+} from "./evidence-schema.js";
 
 export type AssertionMode = "should" | "should_not" | "precondition";
 
@@ -19,22 +21,26 @@ export interface AgentSkillEvalsAssertionResult {
 
 export interface WorldHandle {
   readonly path: string;
-  diff(): Effect.Effect<string, never>;
-  listFiles(glob: string): Effect.Effect<string[], never>;
-  readFile(relativePath: string): Effect.Effect<string | null, never>;
+  listFiles(glob: string): Promise<string[]>;
+  readFile(relativePath: string): Promise<string | null>;
   exec(
     command: string,
     args?: readonly string[],
     opts?: { timeoutMs?: number; env?: Record<string, string> },
-  ): Effect.Effect<{ exitCode: number; stdout: string; stderr: string }, never>;
+  ): Promise<{ exitCode: number; stdout: string; stderr: string }>;
 }
 
 export interface EvidenceHandle {
+  output(): string;
   commands(): readonly CommandEvent[];
   filesWritten(): readonly FileEvent[];
   toolCalls(): readonly ToolCallEvent[];
   skillsLoaded(): readonly SkillLoadEvent[];
+  skillsAvailable(): readonly SkillAvailableEvent[];
   usage(): Usage;
+  turns?(): readonly TurnRecord[];
+  runtime?(): RuntimeIdentity;
+  warnings?(): readonly string[];
 }
 
 export interface VerifierContext {
@@ -46,9 +52,11 @@ export interface VerifierContext {
 
 export interface VerifierPlugin {
   type: string;
-  verify(ctx: VerifierContext): Effect.Effect<AgentSkillEvalsAssertionResult, never>;
+  verify(
+    ctx: VerifierContext,
+  ): AgentSkillEvalsAssertionResult | Promise<AgentSkillEvalsAssertionResult>;
 }
 
 export type RuntimeCheck = VerifierPlugin;
 
-export type { CommandEvent, FileEvent, SkillLoadEvent, ToolCallEvent, Usage };
+export type { CommandEvent, FileEvent, SkillLoadEvent, SkillAvailableEvent, RuntimeIdentity, ToolCallEvent, TurnRecord, Usage };

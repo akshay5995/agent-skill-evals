@@ -1,30 +1,19 @@
 import { join } from "node:path";
-import * as Either from "effect/Either";
-import * as Effect from "effect/Effect";
+import { readFile } from "node:fs/promises";
 import type { AssertionEntry } from "../assertion-entries.js";
 import type {
   AssertionMode,
-  EvidenceHandle,
   AgentSkillEvalsAssertionResult,
   WorldHandle,
 } from "../internal-types.js";
-import { decodeEvidenceSnapshotEither } from "../evidence-schema.js";
+import { decodeEvidenceSnapshot } from "../evidence-schema.js";
 import {
   EvidenceCollector,
   evidenceFromSnapshot,
   type AgentSkillEvalsProviderMetadata,
 } from "../agent/index.js";
 import { makeWorldHandle } from "../agent/world.js";
-import {
-  getRuntimeCheck,
-  RuntimeCheckCatalog,
-  RuntimeCheckCatalogLive,
-} from "../runtime-checks/catalog.js";
-import {
-  Environment,
-  FileSystem,
-  NodeServicesLive,
-} from "../internal-services.js";
+import { RUNTIME_CHECKS_BY_TYPE } from "../runtime-checks/catalog.js";
 
 export interface PromptfooAssertContext {
   vars?: Record<string, unknown>;
@@ -37,7 +26,10 @@ export interface PromptfooAssertContext {
       cached?: number;
     };
   };
-  test?: { vars?: Record<string, unknown> };
+  test?: {
+    vars?: Record<string, unknown>;
+    assert?: Array<{ type?: string; metric?: string; value?: unknown; config?: unknown }>;
+  };
   assertion?: { metric?: string };
   assert?: { metric?: string };
   config?: { metric?: string; agentSkillEvals?: unknown };
@@ -55,76 +47,62 @@ export interface GradingResult {
 export async function loadMetadata(
   context: PromptfooAssertContext,
 ): Promise<AgentSkillEvalsProviderMetadata | null> {
-  return Effect.runPromise(loadMetadataEffect(context).pipe(Effect.provide(NodeServicesLive)));
-}
-
-export function loadMetadataEffect(
-  context: PromptfooAssertContext,
-): Effect.Effect<AgentSkillEvalsProviderMetadata | null, never, FileSystem | Environment> {
-  return Effect.gen(function* () {
   const direct = context.providerResponse?.metadata;
   if (direct && typeof direct === "object" && "worldPath" in direct) {
     return direct as AgentSkillEvalsProviderMetadata;
   }
   // Fallback: AGENT_SKILL_EVALS_RUN_DIR env points at the most recent run.
-  const environment = yield* Environment;
-  const env = yield* environment.env;
-  const runDir = env.AGENT_SKILL_EVALS_RUN_DIR;
+  const runDir = process.env.AGENT_SKILL_EVALS_RUN_DIR;
   if (runDir) {
-    const fs = yield* FileSystem;
-    const parsed = yield* fs.readText(join(runDir, "agent-skill-evals-meta.json")).pipe(
-      Effect.map((buf) => {
-        try {
-          return JSON.parse(buf) as AgentSkillEvalsProviderMetadata;
-        } catch {
-          return null;
-        }
-      }),
-      Effect.catchAll(() => Effect.succeed(null)),
-    );
-    if (parsed) {
-      return parsed;
+    try {
+      const buf = await readFile(join(runDir, "agent-skill-evals-meta.json"), "utf8");
+      return JSON.parse(buf) as AgentSkillEvalsProviderMetadata;
+    } catch {
+      return null;
     }
   }
   return null;
-  });
 }
 
 export async function loadEvidence(
   meta: AgentSkillEvalsProviderMetadata,
 ): Promise<EvidenceCollector> {
-  return Effect.runPromise(loadEvidenceEffect(meta).pipe(Effect.provide(NodeServicesLive)));
-}
-
-export function loadEvidenceEffect(
-  meta: AgentSkillEvalsProviderMetadata,
-): Effect.Effect<EvidenceCollector, Error, FileSystem> {
-  return Effect.gen(function* () {
-  const fs = yield* FileSystem;
-  const buf = yield* fs.readText(meta.evidencePath).pipe(
-    Effect.mapError((err) => new Error(`evidence: failed to read ${meta.evidencePath}: ${err instanceof Error ? err.message : String(err)}`)),
-  );
-  const parsed = yield* Effect.try({
-    try: () => JSON.parse(buf) as unknown,
-    catch: (err) =>
-      new Error(`evidence: invalid JSON in ${meta.evidencePath}: ${err instanceof Error ? err.message : String(err)}`),
-  });
-  const decoded = decodeEvidenceSnapshotEither(parsed);
-  if (Either.isLeft(decoded)) {
-    return yield* Effect.fail(
-      new Error(`evidence: invalid agent-skill-evals.evidence.v1 payload: ${decoded.left.message}`),
+  let buf: string;
+  try {
+    buf = await readFile(meta.evidencePath, "utf8");
+  } catch (err) {
+    throw new Error(
+      `evidence: failed to read ${meta.evidencePath}: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
-  const snapshot = decoded.right;
-  return EvidenceCollector.fromSnapshot(snapshot);
-  });
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(buf) as unknown;
+  } catch (err) {
+    throw new Error(
+      `evidence: invalid JSON in ${meta.evidencePath}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  const decoded = decodeEvidenceSnapshot(parsed);
+  if (!decoded.ok) {
+    // decodeEvidenceSnapshot already produces a user-facing message.
+    throw new Error(`evidence: ${decoded.error.message}`);
+  }
+  return EvidenceCollector.fromSnapshot(decoded.value);
 }
 
 export function loadWorld(
   meta: AgentSkillEvalsProviderMetadata,
   evidenceCollector: EvidenceCollector,
 ): WorldHandle {
-  return makeWorldHandle(meta.worldPath, (event) => evidenceCollector.addCommand(event));
+  const world = makeWorldHandle(meta.worldPath, (event) => evidenceCollector.addCommand(event));
+  if (!meta.mockEnv) return world;
+  return {
+    ...world,
+    exec(command, args, opts = {}) {
+      return world.exec(command, args, { ...opts, env: { ...meta.mockEnv, ...(opts.env ?? {}) } });
+    },
+  };
 }
 
 export async function runEntries(
@@ -133,23 +111,9 @@ export async function runEntries(
   evidenceCollector: EvidenceCollector,
   mode: AssertionMode,
 ): Promise<AgentSkillEvalsAssertionResult[]> {
-  return Effect.runPromise(
-    runEntriesEffect(entries, world, evidenceCollector, mode).pipe(
-      Effect.provide(RuntimeCheckCatalogLive),
-    ),
-  );
-}
-
-export function runEntriesEffect(
-  entries: AssertionEntry[],
-  world: WorldHandle,
-  evidenceCollector: EvidenceCollector,
-  mode: AssertionMode,
-): Effect.Effect<AgentSkillEvalsAssertionResult[], never, RuntimeCheckCatalog> {
-  return Effect.gen(function* () {
   const results: AgentSkillEvalsAssertionResult[] = [];
   for (const entry of entries) {
-    const plugin = yield* getRuntimeCheck(entry.type);
+    const plugin = RUNTIME_CHECKS_BY_TYPE.get(entry.type);
     if (!plugin) {
       results.push({
         pass: false,
@@ -158,7 +122,7 @@ export function runEntriesEffect(
       });
       continue;
     }
-    const r = yield* plugin.verify({
+    const r = await plugin.verify({
       assertion: entry.args,
       world,
       evidence: evidenceFromSnapshot(evidenceCollector.toSnapshot()),
@@ -167,7 +131,6 @@ export function runEntriesEffect(
     results.push(r);
   }
   return results;
-  });
 }
 
 export function aggregate(

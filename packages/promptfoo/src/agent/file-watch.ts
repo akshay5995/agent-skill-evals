@@ -1,48 +1,47 @@
 import { join, relative } from "node:path";
 import { createHash } from "node:crypto";
-import * as Effect from "effect/Effect";
+import { readdir, readFile, stat } from "node:fs/promises";
 import type { FileEvent } from "../internal-types.js";
-import { FileSystem, NodeServicesLive } from "../internal-services.js";
 
 /**
  * Snapshot a directory tree as { relativePath -> sha256 }. Used pre/post
  * agent run to compute file-level diffs. Skips node_modules and .git.
  */
 export async function snapshotTree(root: string): Promise<Map<string, string>> {
-  return Effect.runPromise(snapshotTreeEffect(root).pipe(Effect.provide(NodeServicesLive)));
-}
-
-export function snapshotTreeEffect(
-  root: string,
-): Effect.Effect<Map<string, string>, never, FileSystem> {
-  return Effect.gen(function* () {
   const out = new Map<string, string>();
-  const fs = yield* FileSystem;
-  function walk(dir: string): Effect.Effect<void, never, FileSystem> {
-    return Effect.gen(function* () {
-    const entries = yield* fs.readDirectory(dir).pipe(
-      Effect.catchAll(() => Effect.succeed([])),
-    );
+
+  async function walk(dir: string): Promise<void> {
+    let entries: import("node:fs").Dirent[];
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
     for (const e of entries) {
       const p = join(dir, e.name);
       if (e.isDirectory()) {
         if (e.name === "node_modules" || e.name === ".git") continue;
-        yield* walk(p);
+        await walk(p);
       } else if (e.isFile()) {
-        const buf = yield* fs.readFile(p).pipe(
-          Effect.catchAll(() => Effect.succeed(null)),
-        );
-        if (!buf) continue;
+        let buf: Buffer;
+        try {
+          buf = await readFile(p);
+        } catch {
+          continue;
+        }
         const hash = createHash("sha256").update(buf).digest("hex");
         out.set(relative(root, p), hash);
       }
     }
-    });
   }
-  yield* fs.stat(root).pipe(Effect.catchAll(() => Effect.succeed(null)));
-  yield* walk(root);
+
+  try {
+    await stat(root);
+  } catch {
+    // Missing root yields an empty snapshot.
+  }
+  await walk(root);
   return out;
-  });
 }
 
 export function diffTrees(

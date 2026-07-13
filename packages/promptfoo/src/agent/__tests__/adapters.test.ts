@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import * as Effect from "effect/Effect";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -10,19 +9,17 @@ import {
   handleClaudeEvent,
   handleCodexEvent,
   handlePiEvent,
-  internalTestJsonAdapter,
   piJsonAdapter,
   type Adapter,
   type AdapterRunInput,
 } from "../adapters.js";
-import { ProcessRunnerLive } from "../command-runner.js";
 import { EvidenceCollector } from "../evidence.js";
 import { parseJsonlChunks } from "../jsonl-stream.js";
 
 const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
 
 function runAdapter(adapter: Adapter, input: AdapterRunInput) {
-  return Effect.runPromise(adapter.run(input).pipe(Effect.provide(ProcessRunnerLive)));
+  return adapter.run(input);
 }
 
 describe("JSONL stream parsing", () => {
@@ -53,21 +50,6 @@ function replayJsonl(
 }
 
 describe("codex-json adapter", () => {
-  it("projects Codex JSONL events into final output and evidence", () => {
-    const evidence = new EvidenceCollector();
-    let output = "";
-    handleCodexEvent({ type: "agent_message", message: "done" }, evidence, (s) => (output += s));
-    handleCodexEvent({ type: "tool_call", tool: "Edit", input: { path: "app.js" } }, evidence, () => {});
-    handleCodexEvent({ type: "exec_command", command: "node", args: ["app.js"], exitCode: 0, stdout: "ok" }, evidence, () => {});
-    handleCodexEvent({ type: "usage", usage: { input_tokens: 2, output_tokens: 3, total_tokens: 5 } }, evidence, () => {});
-
-    const snapshot = evidence.toSnapshot();
-    expect(output).toBe("done");
-    expect(snapshot.toolCalls).toMatchObject([{ tool: "Edit", args: { path: "app.js" } }]);
-    expect(snapshot.commands).toMatchObject([{ command: "node", args: ["app.js"], exitCode: 0 }]);
-    expect(snapshot.usage.totalTokens).toBe(5);
-  });
-
   it("normalizes captured Codex JSONL into Core Evidence", () => {
     const { output, evidence } = replayJsonl("codex-jsonl.jsonl", handleCodexEvent);
     const snapshot = evidence.toSnapshot();
@@ -94,6 +76,28 @@ describe("codex-json adapter", () => {
       totalTokens: 18,
       cacheReadTokens: 3,
     });
+  });
+
+  it("records a Codex command once across started and completed lifecycle events", () => {
+    const evidence = new EvidenceCollector();
+    const item = { type: "command_execution", command: "pnpm test", exit_code: 0 };
+    handleCodexEvent({ type: "item.started", item }, evidence, () => {});
+    handleCodexEvent({ type: "item.completed", item }, evidence, () => {});
+
+    expect(evidence.toSnapshot().commands).toMatchObject([
+      { command: "pnpm test", exitCode: 0 },
+    ]);
+  });
+
+  it("records a Codex file change once across started and completed lifecycle events", () => {
+    const evidence = new EvidenceCollector();
+    const item = { type: "file_change", changes: [{ path: "CHANGELOG.md", kind: "add" }] };
+    handleCodexEvent({ type: "item.started", item }, evidence, () => {});
+    handleCodexEvent({ type: "item.completed", item }, evidence, () => {});
+
+    expect(evidence.toSnapshot().toolCalls).toMatchObject([
+      { tool: "Edit", args: { path: "CHANGELOG.md", kind: "add" } },
+    ]);
   });
 
   it("captures Codex MCP tool calls with server and arguments", () => {
@@ -361,7 +365,7 @@ describe("claude-code-json adapter", () => {
   it("normalizes captured Claude stream-json into Core Evidence", () => {
     const { output, evidence } = replayJsonl("claude-stream-json.jsonl", handleClaudeEvent);
     const snapshot = evidence.toSnapshot();
-    expect(output).toBe("I'll patch the redirect.patched app.js");
+    expect(output).toBe("patched app.js");
     expect(snapshot.toolCalls).toMatchObject([
       {
         tool: "Edit",
@@ -409,6 +413,58 @@ describe("claude-code-json adapter", () => {
       expect(evidence.toSnapshot().commands).toMatchObject([
         { command: "node", args: [path], exitCode: 0 },
       ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("explains how to authenticate Claude inside the isolated HOME", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "agent-skill-evals-adapter-"));
+    const path = join(dir, "claude-auth.mjs");
+    writeFileSync(
+      path,
+      [
+        "console.log(JSON.stringify({ type: 'result', result: 'Not logged in · Please run /login' }));",
+        "process.exitCode = 1;",
+      ].join("\n"),
+    );
+    const evidence = new EvidenceCollector();
+    try {
+      const result = await runAdapter(claudeCodeJsonAdapter, {
+        command: "node",
+        args: [path],
+        cwd: dir,
+        prompt: "hello",
+        evidence,
+      });
+      expect(result.output).toContain("CLAUDE_CODE_OAUTH_TOKEN");
+      expect(result.error).toContain("isolated HOME");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("accepts Claude rate-limit telemetry without an adapter-drift warning", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "agent-skill-evals-adapter-"));
+    const path = join(dir, "claude-rate-limit.mjs");
+    writeFileSync(
+      path,
+      [
+        "console.log(JSON.stringify({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed' } }));",
+        "console.log(JSON.stringify({ type: 'result', result: 'done' }));",
+      ].join("\n"),
+    );
+    const evidence = new EvidenceCollector();
+    try {
+      const result = await runAdapter(claudeCodeJsonAdapter, {
+        command: "node",
+        args: [path],
+        cwd: dir,
+        prompt: "hello",
+        evidence,
+      });
+      expect(result.output).toBe("done");
+      expect(evidence.toSnapshot().warnings).toBeUndefined();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -581,6 +637,72 @@ describe("claude-code-json adapter", () => {
 });
 
 describe("pi-json adapter", () => {
+  it("surfaces Pi provider authentication errors from nested messages", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "agent-skill-evals-adapter-"));
+    const path = join(dir, "pi-auth.mjs");
+    writeFileSync(
+      path,
+      "console.log(JSON.stringify({ type: 'message_end', message: { role: 'assistant', content: [], stopReason: 'error', errorMessage: 'No API key for provider: openai-codex' } }));\n",
+    );
+    try {
+      const result = await runAdapter(piJsonAdapter, {
+        command: "node",
+        args: [path],
+        cwd: dir,
+        prompt: "hello",
+        evidence: new EvidenceCollector(),
+      });
+      expect(result.output).toContain("No API key for provider");
+      expect(result.error).toContain("Pi authentication failed");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not infer authentication failure from successful final prose", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "agent-skill-evals-adapter-"));
+    const path = join(dir, "pi-prose.mjs");
+    writeFileSync(
+      path,
+      "console.log(JSON.stringify({ type: 'message_end', message: { role: 'assistant', content: [{ type: 'text', text: 'The docs say No API key for provider.' }], stopReason: 'stop' } }));\n",
+    );
+    try {
+      const result = await runAdapter(piJsonAdapter, {
+        command: "node", args: [path], cwd: dir, prompt: "hello", evidence: new EvidenceCollector(),
+      });
+      expect(result.output).toBe("The docs say No API key for provider.");
+      expect(result.error).toBeUndefined();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("uses every text block from only the final Pi assistant message", () => {
+    const evidence = new EvidenceCollector();
+    let output = "";
+    const setOutput = (text: string, replace = false) => { output = replace ? text : output + text; };
+    handlePiEvent(
+      { type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "I will try an approach." }] } },
+      evidence,
+      setOutput,
+    );
+    handlePiEvent(
+      {
+        type: "message_end",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "text", text: "Patched app.js. " },
+            { type: "text", text: "The verifier passes." },
+          ],
+        },
+      },
+      evidence,
+      setOutput,
+    );
+    expect(output).toBe("Patched app.js. The verifier passes.");
+  });
+
   it("captures token usage from Pi message events", () => {
     const evidence = new EvidenceCollector();
     handlePiEvent(
@@ -641,13 +763,10 @@ describe("pi-json adapter", () => {
         tool: "Bash",
         provider: "pi-json",
         args: { command: "./verify_login_redirect.sh" },
-      }),
-      expect.objectContaining({
-        tool: "Bash",
-        provider: "pi-json",
         result: "ok\n",
       }),
     ]));
+    expect(snapshot.toolCalls.filter((call) => call.tool === "Bash")).toHaveLength(1);
     expect(snapshot.commands).toMatchObject([
       {
         command: "./verify_login_redirect.sh",
@@ -676,18 +795,14 @@ describe("pi-json adapter", () => {
       () => {},
     );
 
-    expect(evidence.toSnapshot().toolCalls).toEqual(expect.arrayContaining([
+    expect(evidence.toSnapshot().toolCalls).toEqual([
       expect.objectContaining({
         tool: "Edit",
         provider: "pi-json",
         args: { path: "app.js" },
-      }),
-      expect.objectContaining({
-        tool: "Edit",
-        provider: "pi-json",
         result: "ok",
       }),
-    ]));
+    ]);
   });
 
   it("records the adapter process command while replaying Pi JSONL", async () => {
@@ -697,7 +812,7 @@ describe("pi-json adapter", () => {
       path,
       [
         "console.log(JSON.stringify({ type: 'tool_execution_end', tool: 'Edit', args: { path: 'app.js' } }));",
-        "console.log(JSON.stringify({ type: 'final', text: 'done' }));",
+        "console.log(JSON.stringify({ type: 'message_end', message: { role: 'assistant', content: [{ type: 'text', text: 'done' }] } }));",
       ].join("\n"),
     );
     const evidence = new EvidenceCollector();
@@ -716,27 +831,6 @@ describe("pi-json adapter", () => {
       expect(evidence.toSnapshot().commands).toMatchObject([
         { command: "node", args: [path], exitCode: 0 },
       ]);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-});
-
-describe("internal-test-json adapter", () => {
-  it("uses deterministic JSON events without documenting another supported agent", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "agent-skill-evals-adapter-"));
-    const path = join(dir, "agent.mjs");
-    writeFileSync(path, "console.log(JSON.stringify({ type: 'agent_message', message: 'ok' }));\n");
-    try {
-      const r = await runAdapter(internalTestJsonAdapter, {
-        command: "node",
-        args: [path],
-        cwd: dir,
-        prompt: "hello",
-        evidence: new EvidenceCollector(),
-      });
-      expect(r.output).toBe("ok");
-      expect(r.exitCode).toBe(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -1,6 +1,0 @@
-{
-  "service": "payments-api",
-  "environment": "prod",
-  "incidentId": "INC-2026-0524-17",
-  "reportedSymptom": "checkout failures increased after the latest deploy"
-}

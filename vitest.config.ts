@@ -5,14 +5,17 @@ export default defineConfig({
   resolve: {
     alias: {
       "agent-skill-evals/agent": fileURLToPath(new URL("./packages/promptfoo/src/agent/index.ts", import.meta.url)),
-      "agent-skill-evals/skill-checks": fileURLToPath(new URL("./packages/promptfoo/src/skill-checks/index.ts", import.meta.url)),
       "agent-skill-evals/assertions": fileURLToPath(new URL("./packages/promptfoo/src/assertions/index.ts", import.meta.url)),
+      "agent-skill-evals/test-generator": fileURLToPath(new URL("./packages/promptfoo/src/test-pack.ts", import.meta.url)),
     },
   },
   test: {
     environment: "node",
     passWithNoTests: true,
-    include: ["packages/**/src/**/*.test.ts"],
+    include: [
+      "packages/**/src/**/*.test.ts",
+      "examples/scripts/**/*.test.mjs",
+    ],
     exclude: [
       "**/node_modules/**",
       "**/dist/**",

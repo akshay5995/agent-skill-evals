@@ -1,117 +1,151 @@
-import * as Either from "effect/Either";
-import * as Schema from "effect/Schema";
-import type { AgentSkillEvalsAssertionResult } from "../internal-types.js";
-import { validationFailure } from "./_helpers.js";
+import { z } from "zod";
+import type {
+  AgentSkillEvalsAssertionResult,
+  AssertionMode,
+} from "../internal-types.js";
 
-const NonEmptyString = Schema.String.pipe(
-  Schema.filter((value) => value.trim().length > 0, {
-    identifier: "NonEmptyString",
-  }),
-);
+export function result(
+  pass: boolean,
+  reason: string,
+  evidence?: unknown,
+): AgentSkillEvalsAssertionResult {
+  return { pass, score: pass ? 1 : 0, reason, evidence };
+}
 
-const OptionalString = Schema.optional(Schema.String);
+export function validationFailure(reason: string): AgentSkillEvalsAssertionResult {
+  return result(false, reason);
+}
 
-export const PathArgsSchema = Schema.Struct({
+/**
+ * Map a "matched" boolean to a pass result based on mode. Used by checks
+ * that don't self-encode polarity (file.exists, tool.called, ...).
+ *
+ * - should: pass = matched
+ * - should_not: pass = !matched
+ * - precondition: pass = matched (precondition asserts a current state)
+ */
+export function applyMode(
+  matched: boolean,
+  mode: AssertionMode,
+  reasonMatched: string,
+  reasonUnmatched: string,
+): AgentSkillEvalsAssertionResult {
+  switch (mode) {
+    case "should":
+    case "precondition":
+      return result(matched, matched ? reasonMatched : reasonUnmatched);
+    case "should_not":
+      return result(!matched, matched ? reasonMatched : reasonUnmatched);
+  }
+}
+
+const NonEmptyString = z.string().trim().min(1);
+const OptionalString = z.string().optional();
+const OptionalNonEmptyString = NonEmptyString.optional();
+
+export const PathArgsSchema = z.object({
   path: NonEmptyString,
 });
 
-export const FileContainsArgsSchema = Schema.Struct({
+export const FileContainsArgsSchema = z.object({
   path: NonEmptyString,
-  text: Schema.String,
+  text: z.string(),
 });
 
-export const FileChangesOutsideScopeArgsSchema = Schema.Struct({
-  scope: Schema.Array(NonEmptyString).pipe(Schema.minItems(1)),
+export const FileChangesWithinArgsSchema = z.object({
+  paths: z.array(NonEmptyString).min(1),
 });
 
-export const CodePatternArgsSchema = Schema.Struct({
-  glob: NonEmptyString,
-  pattern: NonEmptyString,
-});
-
-export const VerifierArgsSchema = Schema.Struct({
+export const VerifierArgsSchema = z.object({
   run: NonEmptyString,
-  args: Schema.optional(Schema.Array(Schema.String)),
-  timeoutMs: Schema.optional(Schema.Number),
+  args: z.array(z.string()).optional(),
+  timeoutMs: z.number().optional(),
 });
 
-export const ToolCalledArgsSchema = Schema.Struct({
+export const ToolCalledArgsSchema = z.object({
   tool: NonEmptyString,
   provider: OptionalString,
   server: OptionalString,
-  args_match: Schema.optional(Schema.Unknown),
+  args_match: z.unknown().optional(),
 });
 
-export const ToolNotCalledArgsSchema = Schema.Struct({
-  tool: OptionalString,
-  provider: OptionalString,
-  server: OptionalString,
-  args_match: Schema.optional(Schema.Unknown),
+const JsonValueSchema = z.union([
+  z.null(),
+  z.boolean(),
+  z.number(),
+  z.string(),
+  z.array(z.unknown()),
+  z.record(z.string(), z.unknown()),
+]);
+
+const ToolNotCalledSelectorSchema = z.object({
+  tool: OptionalNonEmptyString,
+  provider: OptionalNonEmptyString,
+  server: OptionalNonEmptyString,
+  args_match: JsonValueSchema.optional(),
 });
 
-export const SkillLoadedArgsSchema = Schema.Struct({
-  should_include: Schema.optional(Schema.Array(NonEmptyString)),
-  should_exclude: Schema.optional(Schema.Array(NonEmptyString)),
-  delivery: Schema.optional(Schema.Literal("native", "mcp")),
+export const ToolNotCalledArgsSchema = z.intersection(
+  ToolNotCalledSelectorSchema,
+  z.union([
+    z.object({ tool: NonEmptyString }),
+    z.object({ provider: NonEmptyString }),
+    z.object({ server: NonEmptyString }),
+    z.object({ args_match: JsonValueSchema }),
+  ]),
+);
+
+export const SkillSelectionArgsSchema = z.object({
+  skills: z.array(NonEmptyString).min(1),
+  delivery: z.enum(["native", "mcp"]).optional(),
   provider: OptionalString,
   server: OptionalString,
   source: OptionalString,
 });
 
-export interface CodePatternArgs {
-  glob: string;
-  pattern: string;
-}
+export const ToolCountArgsSchema = z.object({
+  tool: OptionalString,
+  provider: OptionalString,
+  server: OptionalString,
+  args_match: z.unknown().optional(),
+  turn: z.number().optional(),
+  before_turn: z.number().optional(),
+  after_turn: z.number().optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+});
 
-export interface FileChangesOutsideScopeArgs {
-  scope: string[];
-}
+export const TurnCountArgsSchema = z.object({
+  min: z.number().optional(),
+  max: z.number().optional(),
+});
 
-export interface FileContainsArgs {
-  path: string;
-  text: string;
-}
+export const ToolSequenceArgsSchema = z.object({
+  order: z.array(NonEmptyString).min(2),
+});
 
-export interface PathArgs {
-  path: string;
-}
+export const OutputContainsArgsSchema = z.object({
+  text: z.string(),
+});
 
-export interface ToolCalledArgs {
-  tool: string;
-  provider?: string;
-  server?: string;
-  args_match?: unknown;
-}
+export const OutputMatchesArgsSchema = z.object({
+  pattern: NonEmptyString,
+  flags: z.string().optional(),
+});
 
-export interface ToolNotCalledArgs {
-  tool?: string;
-  provider?: string;
-  server?: string;
-  args_match?: unknown;
-}
+export type ToolNotCalledArgs = z.infer<typeof ToolNotCalledArgsSchema>;
 
-export interface SkillLoadedArgs {
-  should_include?: string[];
-  should_exclude?: string[];
-  delivery?: "native" | "mcp";
-  provider?: string;
-  server?: string;
-  source?: string;
-}
-
-export interface VerifierArgs {
-  run: string;
-  args?: string[];
-  timeoutMs?: number;
-}
-
-export function decodeCheckArgs<A, I>(
-  schema: Schema.Schema<A, I, never>,
+/**
+ * Decode assertion args with a zod schema. Returns the parsed value, or a
+ * failed assertion result carrying `invalidReason` when parsing fails.
+ */
+export function decodeCheckArgs<T>(
+  schema: z.ZodType<T>,
   assertion: unknown,
   invalidReason: string,
-): A | AgentSkillEvalsAssertionResult {
-  const decoded = Schema.decodeUnknownEither(schema, { errors: "all" })(assertion ?? {});
-  return Either.isRight(decoded) ? decoded.right : validationFailure(invalidReason);
+): T | AgentSkillEvalsAssertionResult {
+  const decoded = schema.safeParse(assertion ?? {});
+  return decoded.success ? decoded.data : validationFailure(invalidReason);
 }
 
 export function isValidationFailure(value: unknown): value is AgentSkillEvalsAssertionResult {
@@ -127,10 +161,9 @@ export function isValidationFailure(value: unknown): value is AgentSkillEvalsAss
 export function decodeToolNotCalledArgs(
   assertion: unknown,
 ): ToolNotCalledArgs | AgentSkillEvalsAssertionResult {
-  const decoded = decodeCheckArgs(
+  return decodeCheckArgs(
     ToolNotCalledArgsSchema,
     assertion,
     "tool.not_called: assertion must include at least one selector",
   );
-  return decoded;
 }

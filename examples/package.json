@@ -4,24 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "eval": "pnpm run eval:static",
-    "eval:static": "PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo eval -c promptfoo.skill-checks.yaml --no-cache --no-write",
-    "eval:codex": "PATH=$HOME/.local/bin:$PATH PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo eval -c promptfoo.codex.yaml --no-cache --no-write",
-    "eval:claude": "PATH=$HOME/.local/bin:$PATH PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo eval -c promptfoo.claude.yaml --no-cache --no-write",
-    "eval:pi": "PATH=$HOME/.local/bin:$PATH PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo eval -c promptfoo.pi.yaml --no-cache --no-write",
-    "mcp:setup": "uv sync --project mcp",
-    "mcp:serve": "AGENT_SKILL_EVALS_EXAMPLES_DIR=$PWD uv run --project mcp fastmcp run mcp/skill_server.py --transport streamable-http --host ${AGENT_SKILL_EVALS_MCP_HOST:-127.0.0.1} --port ${AGENT_SKILL_EVALS_MCP_PORT:-8765} --path /mcp/",
-    "eval:mcp": "pnpm run eval:mcp:claude && pnpm run eval:mcp:codex",
-    "eval:mcp:claude": "PATH=$HOME/.local/bin:$PATH PROMPTFOO_DISABLE_TELEMETRY=1 node scripts/with-http-mcp.mjs promptfoo eval -c promptfoo.mcp.yaml --no-cache --no-write",
-    "eval:mcp:codex": "PATH=$HOME/.local/bin:$PATH PROMPTFOO_DISABLE_TELEMETRY=1 node scripts/with-http-mcp.mjs promptfoo eval -c promptfoo.mcp.codex.yaml --no-cache --no-write",
-    "eval:native:pi": "PATH=$HOME/.local/bin:$PATH PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo eval -c promptfoo.pi.native.yaml --no-cache --no-write",
-    "eval:routing": "pnpm run eval:mcp && pnpm run eval:native:pi",
-    "eval:real": "export PATH=$HOME/.local/bin:$PATH; if command -v codex >/dev/null 2>&1; then pnpm run eval:codex; else echo 'Skipping eval:codex: codex CLI not found'; fi && if command -v claude >/dev/null 2>&1; then pnpm run eval:claude; else echo 'Skipping eval:claude: claude CLI not found'; fi && if command -v pi >/dev/null 2>&1; then pnpm run eval:pi; else echo 'Skipping eval:pi: pi CLI not found'; fi"
+    "eval:codex": "PATH=$HOME/.local/bin:$PATH PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo eval -c promptfooconfig.yaml --no-cache --no-write --filter-providers codex-real-agent",
+    "eval:claude": "PATH=$HOME/.local/bin:$PATH PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo eval -c promptfooconfig.yaml --no-cache --no-write --filter-providers claude-real-agent",
+    "eval:pi": "PATH=$HOME/.local/bin:$PATH PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo eval -c promptfooconfig.yaml --no-cache --no-write --filter-providers pi-real-agent",
+    "eval:multiturn": "pnpm run eval:codex -- --filter 'keeps following'",
+    "eval:real": "node scripts/eval-real.mjs"
   },
   "dependencies": {
-    "agent-skill-evals": "workspace:*",
-    "adm-zip": "^0.5.17",
-    "pptxgenjs": "^4.0.1"
+    "agent-skill-evals": "workspace:*"
   },
   "devDependencies": {
     "promptfoo": "^0.121.13"

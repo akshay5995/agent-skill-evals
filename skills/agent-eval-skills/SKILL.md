@@ -1,196 +1,74 @@
 ---
 name: agent-eval-skills
-description: |
-  Use when the user has an existing agent SKILL.md and wants to add
-  Promptfoo-native Agent Skill Evals coverage, package setup, runtime fixtures,
-  verifier scripts, or Codex/Claude/Pi agent eval configs.
-
-  Do not use for: writing the domain skill from scratch, replacing Promptfoo
-  with a custom runner, generic test advice, or judging agent intent without
-  observable evidence.
+description: Evaluate an existing agent skill with Promptfoo-native behavior, routing, or role-play tests. Use when a skill needs executable evidence that its product promise works. Do not use to author the domain skill itself.
 ---
 
-# agent-eval-skills
+# Agent Skill Evals
 
-Promise: add a small, runnable Agent Skill Evals harness for an existing skill.
+Build a tight red → evidence → green loop. Promptfoo is the runtime; `agent-skill-evals` supplies its provider, assertions, Test Pack, and static checks. Batch related reads and spend agent turns only on evidence that can change the eval.
 
-## First Move
+## 1. Contract
 
-Plan first. Read the target skill, package files, existing tests, and fixture
-files before editing. Ask at most three short questions only when the repo does
-not reveal required details such as MCP server names, allowed tools, forbidden
-tools, expected output files, or token budget limits.
+Read the target `SKILL.md`, every file it points to, and existing project tests. State the smallest observable product promise and choose one branch: behavior, routing, or role-play.
 
-Keep Promptfoo as the runner. Add package setup and normal Promptfoo configs;
-do not add a custom runner or a root `agent-skill-evals` import.
+Complete when the promise names an observable outcome and the selected branch matches it.
 
-## Terms And Loop
+## 2. Scaffold
 
-1. Target skill: the existing skill being evaluated.
-2. Example fixture: a small incomplete workspace or input project.
-3. Verifier: a local script that fails before the task and passes after it.
-4. Runtime test pack: Promptfoo YAML that runs the agent and checks evidence.
-5. Run the smallest useful check, inspect evidence on failure, and tighten the
-   skill or test instead of weakening the assertion.
+Detect the repository's package manager and install `agent-skill-evals` and `promptfoo` as development dependencies when absent. Run installed binaries through that package manager:
 
-## Files To Add
-
-For a target skill such as a release-notes skill file, add:
-
-- local loader files for the agent provider, skill-check provider, and assertions
-- a Promptfoo skill-check config
-- an agent config for the available CLI, usually Codex first
-- a runtime test pack for the target skill
-- an example fixture and verifier script for the target skill
-
-Add `promptfoo` and `agent-skill-evals` as dev dependencies using the repo's
-package manager. If install commands are blocked, update the package manifest and
-tell the user which install command remains.
-
-Loader files should be exactly this shape:
-
-```js
-// agent-skill-evals/agent.js
-export { default } from "agent-skill-evals/agent";
+```sh
+pnpm exec agent-skill-evals init --skill <path> --adapter <codex|claude-code|pi>
 ```
 
-```js
-// agent-skill-evals/skill-checks.js
-export { default } from "agent-skill-evals/skill-checks";
-```
+Adapt the command to the detected manager, such as `npx agent-skill-evals` for npm. Treat CLI help and generated files as the interface; source and built bundles are outside the setup path.
 
-```js
-// agent-skill-evals/assertions.js
-export { default } from "agent-skill-evals/assertions";
-export * from "agent-skill-evals/assertions";
-```
+Complete when the generated config imports the package's public entry points and `promptfoo eval` remains the runtime command.
 
-## Runtime Test Shape
+## 3. Red
 
-Each runtime test case should have its own `assert` block and prove behavior
-through evidence:
+Add the smallest realistic fixture. When final output cannot prove the promise, add a deterministic verifier that fails before the agent runs. Verify stable structure and facts, not incidental prose: normalize formatting, accept grammatical variation, and reject missing, misplaced, or invented facts. Exact bytes are the contract only when the target skill promises exact bytes.
+
+When the promise is unrestricted semantic equivalence and the result is present in final output, use a native Promptfoo model-graded assertion under `promptfoo.assert` rather than growing a synonym list.
+
+Complete when the verifier fails on the missing behavior and passes representative valid variations without accepting an invalid result.
+
+## 4. Evidence
+
+Replace the starter TODO with one realistic case under `tests/` and one `expect` list:
 
 ```yaml
-- description: target skill performs the task
-  vars:
-    skill: target-skill
-    kind: positive
-    fixture: ./fixtures/target-skill
-    prompt: "Use the target skill to perform the realistic task."
+skill: ../skills/target-skill
+tests:
+  - prompt: Perform the realistic task.
+    fixture: ../fixtures/target-skill
     preconditions:
-      - verifier.fails:
-          run: ./verify_target_skill.cjs
-    should:
-      - verifier.succeeds:
-          run: ./verify_target_skill.cjs
-      - file.created:
-          path: expected-output.md
-    should_not:
-      - file.changes_outside_scope:
-          scope:
-            - expected-output.md
-  assert:
-    - type: javascript
-      metric: skill.test
-      value: file://./agent-skill-evals/assertions.js
-      config:
-        metric: skill.test
+      - verifier.fails: { run: ./verify.sh }
+    expect:
+      - verifier.succeeds: { run: ./verify.sh }
+      - file.changes_within: { paths: [expected-output.md] }
+      - tool.not_called: { tool: destructive_action }
 ```
 
-Use `skill`, not `name`. Keep runtime checks under `preconditions`, `should`,
-and `should_not`; do not put checks like `file.created` directly in Promptfoo
-assertions. Paths are relative to the copied fixture root. Use `scope` for
-`file.changes_outside_scope`. Do not add unsupported fields such as `cwd`,
-`allowed`, `fixture`, or `metric` inside individual runtime checks.
+For behavior, explicitly invoke the target skill. For routing, add distractors and prove both `skill.loaded` and `skill.not_loaded`; availability alone is insufficient. For role-play, use `conversation.scripted_user` for deterministic dialogue or `conversation.simulated_user` when variation is the subject, and set `max_turns`.
 
-Every test pack should include at least one positive case and one negative or
-boundary case. Do not use `file.created` as a precondition for a file that
-already exists; use a failing verifier to prove the start state.
+Use real observed evidence. Local HTTP, command, or MCP mocks may stand in for external systems while preserving the real boundary.
 
-## Skill Loading And Tools
+Complete when every assertion traces to the product promise and the case has no unrelated requirements.
 
-For routing, prove observable skill loading before task success. Use this shape
-only when the adapter or MCP server records skill evidence:
+## 5. Green
 
-```yaml
-- skill.loaded:
-    delivery: mcp
-    should_include:
-      - target-skill
+Run the static check before the paid eval, then run Promptfoo through the detected package manager:
+
+```sh
+pnpm exec agent-skill-evals check <skill> --tests <test-pack>
+pnpm exec promptfoo eval
 ```
 
-Do not write `skill.loaded: { name: target-skill }`. If skill loading is not
-observable, rely on verifier, file, command, and tool evidence.
+On failure, inspect `evidence.json`, the retained World, and verifier output before changing the test. Strengthen the product or its evidence boundary; preserve the target skill's intended behavior.
 
-Tool checks only inspect recorded adapter evidence. The tool field is `tool`:
+Complete when static checks pass, the generated runtime eval passes with an authenticated supported CLI, and the run stays within its existing token budget. Treat a budget failure as an efficiency regression to minimize; preserve the ceiling while removing unnecessary turns and context. If no authenticated CLI is available, report runtime validation as pending rather than complete.
 
-```yaml
-- tool.called:
-    tool: mcp__incident_ops__get_service_status
-    server: incident_ops
-```
+## Product boundary
 
-Keep forbidden tool checks under `should` because `tool.not_called` already
-means "this must not happen."
-
-## MCP, Budgets, And Clarification
-
-For MCP-backed workflow skills, add an MCP agent config such as
-the MCP-specific Codex Promptfoo config, configure the server through env-expanded args, and
-add checks for:
-
-- expected skill loading with `delivery: mcp`
-- required tool calls
-- forbidden tool calls
-- output files and scope boundaries
-
-When token use matters, add a `skill.budget` assertion beside every runtime
-test assertion and add a static `skill.budgets` check with
-`config.agentSkillEvals.requireTokenBudget: true`.
-
-When the correct behavior is to ask a clarifying question, prove the boundary
-with no-tool and no-file evidence, then add a native Promptfoo `llm-rubric`
-assertion to judge the final text. Do not use an LLM judge as the only proof of
-tool use, file changes, skill loading, or budget behavior.
-
-## Validator
-
-After scaffolding, run the bundled validator when available:
-
-```bash
-node skills/agent-eval-skills/scripts/validate-agent-skill-evals-setup.mjs \
-  --skill release-notes \
-  --output CHANGELOG.md
-```
-
-For MCP/tool/budget workflows, use stricter flags:
-
-```bash
-node skills/agent-eval-skills/scripts/validate-agent-skill-evals-setup.mjs \
-  --skill incident-triage \
-  --agentConfig promptfoo.mcp.codex.yaml \
-  --output incident-summary.md \
-  --requireMcp \
-  --requireSkillLoaded \
-  --skillLoadedDelivery mcp \
-  --requireToolCalled mcp__incident_ops__get_service_status \
-  --requireToolNotCalled mcp__incident_ops__restart_service \
-  --requireBudget \
-  --requireBudgetsCheck \
-  --requireLlmRubric \
-  --requireClarificationCase
-```
-
-If this skill is installed into an agent-specific skills directory, adapt the
-script path to that installed location.
-
-## Boundaries
-
-- Do not edit the target skill unless failed evidence shows the instructions are
-  too weak or mismatched to the test.
-- Do not modify source fixtures except to add verifier scripts or create the
-  sample project.
-- Do not add fake agent stubs to public examples.
-- Do not claim success from final text alone; require evidence.
-- Do not fetch remote data unless the skill explicitly needs it and the test
-  can make that dependency reliable.
+Keep the public surface Promptfoo-native: package entry points, realistic examples, evidence assertions, and optional real-boundary mocks. Extend those seams when the eval needs more capability.

@@ -3,8 +3,216 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AgentSkillEvalsProvider } from "../index.js";
+import skillTest from "../../assertions/skill-test.js";
 
 describe("AgentSkillEvalsProvider", () => {
+  it("grades routing from observed MCP skill-load evidence", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "agent-skill-evals-provider-"));
+    const skill = join(dir, "skills", "demo");
+    const agent = join(dir, "routing-agent.mjs");
+    mkdirSync(skill, { recursive: true });
+    writeFileSync(join(skill, "SKILL.md"), "---\nname: demo\ndescription: Use when testing demo routing. Do not use otherwise.\n---\n\nHandle the demo.\n");
+    writeFileSync(
+      agent,
+      [
+        "console.log(JSON.stringify({ type: 'item.completed', item: { type: 'mcp_tool_call', server: 'agent_skill_evals', tool: 'read_mcp_resource', arguments: { uri: 'skill://demo/SKILL.md' }, result: 'ok' } }));",
+        "console.log(JSON.stringify({ type: 'agent_message', message: 'done' }));",
+      ].join("\n"),
+    );
+
+    try {
+      const provider = new AgentSkillEvalsProvider({
+        config: { adapter: "codex-json", command: "node", args: [agent], baseDir: dir },
+      });
+      const assertions = [
+        { "skill.loaded": { skills: ["demo"] } },
+        { "skill.not_loaded": { skills: ["agent-skill-evals-neutral"] } },
+      ];
+      const response = await provider.callApi("Choose the right skill", {
+        vars: {
+          prompt: "Choose the right skill",
+          skillPath: "./skills/demo",
+          testPackDir: dir,
+          mode: "routing",
+          builtinDistractor: true,
+          expect: assertions,
+        },
+      });
+      const graded = await skillTest(response.output, {
+        providerResponse: { metadata: response.metadata },
+        vars: { expect: assertions },
+      });
+
+      expect(response.error).toBeUndefined();
+      expect(graded.pass).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runs a command mock through the isolated PATH", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "agent-skill-evals-provider-"));
+    const command = join(dir, "mock-deploy");
+    const agent = join(dir, "mock-agent.mjs");
+    writeFileSync(command, "#!/bin/sh\nprintf DEPLOY_MOCK_OK\n", { mode: 0o755 });
+    writeFileSync(
+      agent,
+      [
+        "import { execFileSync } from 'node:child_process';",
+        "const value = execFileSync('deploy', { encoding: 'utf8' }).trim();",
+        "console.log(JSON.stringify({ type: 'agent_message', message: value }));",
+      ].join("\n"),
+    );
+
+    try {
+      const provider = new AgentSkillEvalsProvider({
+        config: { adapter: "codex-json", command: "node", args: [agent], baseDir: dir },
+      });
+      const response = await provider.callApi("Deploy safely", {
+        vars: {
+          environment: {
+            mocks: [{ name: "deploy", kind: "command", executable: command }],
+          },
+        },
+      });
+
+      expect(response.error).toBeUndefined();
+      expect(response.output).toBe("DEPLOY_MOCK_OK");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runs fixtureless with hermetic skills and an HTTP Mock Service", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "agent-skill-evals-provider-"));
+    const skill = join(dir, "skills", "demo");
+    const server = join(dir, "mock-server.mjs");
+    const agent = join(dir, "mock-agent.mjs");
+    mkdirSync(skill, { recursive: true });
+    writeFileSync(join(skill, "SKILL.md"), "---\nname: demo\ndescription: Use when testing the demo. Do not use otherwise.\n---\nReturn the mock value.\n");
+    writeFileSync(
+      server,
+      [
+        "import http from 'node:http';",
+        "const server = http.createServer((req, res) => {",
+        "  if (req.url === '/health') { res.end('ok'); return; }",
+        "  res.end('mock-value');",
+        "});",
+        "server.listen(Number(process.env.PORT), '127.0.0.1');",
+      ].join("\n"),
+    );
+    writeFileSync(
+      agent,
+      [
+        "const value = await fetch(process.env.BILLING_API_URL + '/value').then((r) => r.text());",
+        "console.log(JSON.stringify({ type: 'agent_message', message: value }));",
+      ].join("\n"),
+    );
+
+    try {
+      const provider = new AgentSkillEvalsProvider({
+        config: { adapter: "codex-json", command: "node", args: [agent], baseDir: dir },
+      });
+      const response = await provider.callApi("Read the billing value", {
+        vars: {
+          prompt: "Read the billing value",
+          skillPath: "./skills/demo",
+          testPackDir: dir,
+          mode: "behavior",
+          expect: [{ "output.contains": { text: "mock-value" } }],
+          environment: {
+            mocks: [
+              {
+                name: "billing-api",
+                kind: "http",
+                command: "node",
+                args: [server],
+                ready: { path: "/health", timeout_ms: 5_000 },
+                expose_as: "BILLING_API_URL",
+              },
+            ],
+          },
+        },
+      });
+
+      expect(response.error).toBeUndefined();
+      expect(response.output).toBe("mock-value");
+      expect(response.metadata?.fixture).toBeUndefined();
+      const evidence = JSON.parse(readFileSync(response.metadata?.evidencePath as string, "utf8")) as {
+        skillsAvailable: Array<{ skill: string; role: string }>;
+        skillsLoaded: Array<{ skill: string; delivery: string }>;
+      };
+      expect(evidence.skillsAvailable).toContainEqual(expect.objectContaining({ skill: "demo", role: "under-test" }));
+      expect(evidence.skillsLoaded).toEqual([]);
+      const graded = await skillTest("mock-value", {
+        providerResponse: { metadata: response.metadata },
+        vars: { expect: [{ "output.contains": { text: "mock-value" } }] },
+      });
+      expect(graded.pass).toBe(true);
+      const lifecycle = JSON.parse(readFileSync(join(response.metadata?.runDir as string, "mock-services.json"), "utf8"));
+      expect(lifecycle).toMatchObject([{ name: "billing-api", readyAt: expect.any(Number), stoppedAt: expect.any(Number) }]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps MCP mocks away from the simulated user by default", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "agent-skill-evals-provider-"));
+    const agent = join(dir, "conversation-agent.mjs");
+    writeFileSync(
+      agent,
+      [
+        "const prompt = process.argv.at(-1) ?? '';",
+        "const hasMock = process.argv.some((arg) => arg.includes('mcp_servers.crm'));",
+        "const output = prompt.includes('HUMAN USER') ? (hasMock ? 'LEAKED' : '<<DONE>>') : 'agent reply';",
+        "console.log(JSON.stringify({ type: 'agent_message', message: output }));",
+      ].join("\n"),
+    );
+
+    try {
+      const provider = new AgentSkillEvalsProvider({
+        config: {
+          preset: "codex",
+          adapter: "codex-json",
+          command: "node",
+          args: [agent],
+          baseDir: dir,
+        },
+      });
+      const response = await provider.callApi("Start", {
+        vars: {
+          conversation: {
+            maxTurns: 2,
+            user: { goal: "Finish after the first reply" },
+            simulatedUserAllowMocks: false,
+          },
+          environment: {
+            mocks: [
+              {
+                name: "crm",
+                kind: "mcp",
+                transport: "http",
+                url: "http://127.0.0.1:9999/mcp",
+              },
+            ],
+          },
+        },
+      });
+
+      expect(response.error).toBeUndefined();
+      const evidence = JSON.parse(readFileSync(response.metadata?.evidencePath as string, "utf8")) as {
+        turns: Array<{ role: string }>;
+      };
+      expect(evidence.turns.filter((turn) => turn.role === "agent")).toHaveLength(1);
+      await skillTest(response.output, {
+        providerResponse: { metadata: response.metadata },
+        vars: { expect: [{ "output.contains": { text: "agent reply" } }] },
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("returns a provider error when an adapter emits output but exits non-zero", async () => {
     const dir = mkdtempSync(join(tmpdir(), "agent-skill-evals-provider-"));
     const fixture = join(dir, "fixture");
@@ -103,7 +311,7 @@ describe("AgentSkillEvalsProvider", () => {
     }
   });
 
-  it("records deterministic Pi native skill loading when discovery is disabled", async () => {
+  it("does not mistake a configured Pi skill for observed loading", async () => {
     const dir = mkdtempSync(join(tmpdir(), "agent-skill-evals-provider-"));
     const fixture = join(dir, "fixture");
     const agent = join(dir, "agent.mjs");
@@ -135,14 +343,7 @@ describe("AgentSkillEvalsProvider", () => {
       const evidence = JSON.parse(readFileSync(evidencePath as string, "utf8")) as {
         skillsLoaded: Array<{ skill: string; delivery: string; provider?: string; source?: string }>;
       };
-      expect(evidence.skillsLoaded).toMatchObject([
-        {
-          skill: "brand-deck",
-          delivery: "native",
-          provider: "pi-json",
-          source: "--skill",
-        },
-      ]);
+      expect(evidence.skillsLoaded).toEqual([]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -222,7 +423,7 @@ describe("AgentSkillEvalsProvider", () => {
     }
   });
 
-  it("records configured native skill loading from custom flags", async () => {
+  it("does not infer skill loading from custom command flags", async () => {
     const dir = mkdtempSync(join(tmpdir(), "agent-skill-evals-provider-"));
     const fixture = join(dir, "fixture");
     const agent = join(dir, "agent.mjs");
@@ -258,14 +459,37 @@ describe("AgentSkillEvalsProvider", () => {
       const evidence = JSON.parse(readFileSync(evidencePath as string, "utf8")) as {
         skillsLoaded: Array<{ skill: string; delivery: string; provider?: string; source?: string }>;
       };
-      expect(evidence.skillsLoaded).toMatchObject([
-        {
-          skill: "brand-deck",
-          delivery: "native",
-          provider: "custom-json",
-          source: "--load-skill",
-        },
-      ]);
+      expect(evidence.skillsLoaded).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("reuses one isolated auth home across fresh Worlds", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "agent-skill-evals-provider-"));
+    const agent = join(dir, "auth-state-agent.mjs");
+    writeFileSync(
+      agent,
+      [
+        "import { existsSync, writeFileSync } from 'node:fs';",
+        "import { join } from 'node:path';",
+        "const marker = join(process.env.HOME, 'refreshed-auth');",
+        "const output = existsSync(marker) ? 'second' : 'first';",
+        "writeFileSync(marker, 'refreshed');",
+        "console.log(JSON.stringify({ type: 'agent_message', message: output }));",
+      ].join("\n"),
+    );
+
+    try {
+      const provider = new AgentSkillEvalsProvider({
+        config: { adapter: "codex-json", command: "node", args: [agent], baseDir: dir },
+      });
+      const first = await provider.callApi("first", { vars: {} });
+      const second = await provider.callApi("second", { vars: {} });
+
+      expect(first.output).toBe("first");
+      expect(second.output).toBe("second");
+      expect(first.metadata?.worldPath).not.toBe(second.metadata?.worldPath);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

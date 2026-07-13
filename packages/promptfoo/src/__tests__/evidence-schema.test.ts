@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseEvidenceSnapshot } from "../evidence-schema.js";
 
 const baseEvidence = {
-  schemaVersion: "agent-skill-evals.evidence.v1",
+  schemaVersion: "agent-skill-evals.evidence.v2",
   output: "done",
   run: {
     runDir: "/tmp/run",
@@ -12,57 +12,32 @@ const baseEvidence = {
 };
 
 describe("Evidence Schema", () => {
-  it("accepts produced v1 file operations", () => {
-    expect(
-      parseEvidenceSnapshot({
-        ...baseEvidence,
-        filesWritten: [{ path: "app.js", op: "modify" }],
-      }).filesWritten,
-    ).toEqual([{ path: "app.js", op: "modify" }]);
-  });
-
-  it("accepts optional normalized tool-call server names", () => {
-    expect(
-      parseEvidenceSnapshot({
-        ...baseEvidence,
-        toolCalls: [{
+  it("accepts produced evidence fields", () => {
+    const evidence = {
+      ...baseEvidence,
+      filesWritten: [{ path: "app.js", op: "modify" }],
+      toolCalls: [
+        {
           tool: "Edit",
           provider: "codex-json",
           server: "filesystem",
           startedAt: 1,
           durationMs: 2,
-        }],
-      }).toolCalls,
-    ).toEqual([{
-      tool: "Edit",
-      provider: "codex-json",
-      server: "filesystem",
-      startedAt: 1,
-      durationMs: 2,
-    }]);
-  });
-
-  it("accepts loaded skill evidence", () => {
-    expect(
-      parseEvidenceSnapshot({
-        ...baseEvidence,
-        skillsLoaded: [{
+        },
+      ],
+      skillsLoaded: [
+        {
           skill: "brand-deck",
           delivery: "mcp",
           provider: "claude-code-json",
           server: "agent-skill-evals",
           source: "load_brand_deck_skill",
           startedAt: 1,
-        }],
-      }).skillsLoaded,
-    ).toEqual([{
-      skill: "brand-deck",
-      delivery: "mcp",
-      provider: "claude-code-json",
-      server: "agent-skill-evals",
-      source: "load_brand_deck_skill",
-      startedAt: 1,
-    }]);
+        },
+      ],
+      skillsAvailable: [{ skill: "brand-deck", path: "/tmp/skills/brand-deck", role: "under-test" }],
+    };
+    expect(parseEvidenceSnapshot(evidence)).toMatchObject(evidence);
   });
 
   it("rejects unproduced file fields", () => {

@@ -1,49 +1,39 @@
 import { join, relative } from "node:path";
-import * as Effect from "effect/Effect";
-import { FileSystem, NodeServicesLive } from "../internal-services.js";
+import { readdir, stat } from "node:fs/promises";
 
 const SKIP_DIRS = new Set(["node_modules", ".git"]);
 
 export async function walkFiles(
   root: string,
-  visit: (relativePath: string, absolutePath: string) => Promise<void> | void,
+  visit: (relativePath: string, absolutePath: string) => void | Promise<void>,
 ): Promise<void> {
-  return Effect.runPromise(
-    walkFilesEffect(root, (relativePath, absolutePath) =>
-      Effect.promise(() => Promise.resolve(visit(relativePath, absolutePath))),
-    ).pipe(Effect.provide(NodeServicesLive)),
-  );
-}
-
-export function walkFilesEffect(
-  root: string,
-  visit: (relativePath: string, absolutePath: string) => Effect.Effect<void, never, FileSystem>,
-): Effect.Effect<void, never, FileSystem> {
-  return Effect.gen(function* () {
-  const fs = yield* FileSystem;
-  function walk(dir: string): Effect.Effect<void, never, FileSystem> {
-    return Effect.gen(function* () {
-    const entries = yield* fs.readDirectory(dir).pipe(
-      Effect.catchAll(() => Effect.succeed([])),
-    );
+  async function walk(dir: string): Promise<void> {
+    let entries: import("node:fs").Dirent[];
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
     for (const entry of entries) {
       const absolutePath = join(dir, entry.name);
       if (entry.isDirectory()) {
         if (SKIP_DIRS.has(entry.name)) continue;
-        yield* walk(absolutePath);
+        await walk(absolutePath);
         continue;
       }
       if (entry.isFile()) {
-        yield* visit(relative(root, absolutePath), absolutePath);
+        await visit(relative(root, absolutePath), absolutePath);
       }
     }
-    });
   }
 
-  const rootStat = yield* fs.stat(root).pipe(Effect.catchAll(() => Effect.succeed(null)));
-  if (!rootStat?.isDirectory()) return;
-  yield* walk(root);
-  });
+  try {
+    const rootStat = await stat(root);
+    if (!rootStat.isDirectory()) return;
+  } catch {
+    return;
+  }
+  await walk(root);
 }
 
 /**
@@ -52,20 +42,11 @@ export function walkFilesEffect(
  * dependency.
  */
 export async function listMatchingFiles(root: string, glob: string): Promise<string[]> {
-  return Effect.runPromise(listMatchingFilesEffect(root, glob).pipe(Effect.provide(NodeServicesLive)));
-}
-
-export function listMatchingFilesEffect(
-  root: string,
-  glob: string,
-): Effect.Effect<string[], never, FileSystem> {
-  return Effect.gen(function* () {
   const matches: string[] = [];
-  yield* walkFilesEffect(root, (relativePath) => Effect.sync(() => {
+  await walkFiles(root, (relativePath) => {
     if (matchesGlob(relativePath, glob)) matches.push(relativePath);
-  }));
-  return matches;
   });
+  return matches;
 }
 
 export function matchesGlob(relativePath: string, glob: string): boolean {

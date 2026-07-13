@@ -1,8 +1,4 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import * as Clock from "effect/Clock";
-import * as Context from "effect/Context";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
 
 export interface CommandRunOptions {
   cwd: string;
@@ -32,19 +28,6 @@ const DEFAULT_OUTPUT_LIMIT = 4096;
 const KILL_GRACE_MS = 1_000;
 const EXIT_STDIO_FLUSH_MS = 50;
 
-interface ProcessRunnerService {
-  run(
-    command: string,
-    args: readonly string[],
-    options: CommandRunOptions,
-  ): Effect.Effect<CommandRunResult>;
-}
-
-export class ProcessRunner extends Context.Tag("agent-skill-evals/promptfoo/ProcessRunner")<
-  ProcessRunner,
-  ProcessRunnerService
->() {}
-
 function appendLimited(current: string, chunk: string, limit: number): string {
   if (limit <= 0) return "";
   const next = current + chunk;
@@ -68,41 +51,19 @@ function killProcessGroup(child: ChildProcess, signal: NodeJS.Signals): void {
   }
 }
 
+// This stays custom because it preserves process-group kill, forced timeout,
+// and inherited-stdio behavior that off-the-shelf runners have not been
+// proven to match.
 export function runCommand(
   command: string,
   args: readonly string[] = [],
   options: CommandRunOptions,
 ): Promise<CommandRunResult> {
-  return Effect.runPromise(
-    runCommandEffect(command, args, options).pipe(Effect.provide(ProcessRunnerLive)),
-  );
-}
-
-export function runCommandEffect(
-  command: string,
-  args: readonly string[] = [],
-  options: CommandRunOptions,
-): Effect.Effect<CommandRunResult, never, ProcessRunner> {
-  return Effect.flatMap(ProcessRunner, (runner) => runner.run(command, args, options));
-}
-
-// This stays custom because it preserves process-group kill, forced timeout,
-// and inherited-stdio behavior that platform Command has not been proven to match.
-export const ProcessRunnerLive = Layer.succeed(ProcessRunner, {
-  run: nodeRunCommandEffect,
-});
-
-function nodeRunCommandEffect(
-  command: string,
-  args: readonly string[],
-  options: CommandRunOptions,
-): Effect.Effect<CommandRunResult> {
   const stdoutLimit = options.stdoutLimit ?? DEFAULT_OUTPUT_LIMIT;
   const stderrLimit = options.stderrLimit ?? DEFAULT_OUTPUT_LIMIT;
+  const startedAt = Date.now();
 
-  return Effect.gen(function* () {
-  const startedAt = yield* Clock.currentTimeMillis;
-  return yield* Effect.async<CommandRunResult>((resume, signal) => {
+  return new Promise<CommandRunResult>((resolve) => {
     const child = spawn(command, [...args], {
       cwd: options.cwd,
       env: options.env,
@@ -117,7 +78,6 @@ function nodeRunCommandEffect(
     let timeoutTimer: NodeJS.Timeout | null = null;
     let forceTimer: NodeJS.Timeout | null = null;
     let exitFlushTimer: NodeJS.Timeout | null = null;
-    let abortListener: (() => void) | null = null;
 
     const finish = (result: Omit<CommandRunResult, "durationMs">) => {
       if (settled) return;
@@ -128,38 +88,12 @@ function nodeRunCommandEffect(
       child.stdout?.destroy();
       child.stderr?.destroy();
       child.stdin?.destroy();
-      if (abortListener) signal.removeEventListener("abort", abortListener);
       if (process.platform !== "win32") killProcessGroup(child, "SIGTERM");
-      resume(
-        Clock.currentTimeMillis.pipe(
-          Effect.map((endedAt) => ({
-            ...result,
-            durationMs: endedAt - startedAt,
-          })),
-        ),
-      );
-    };
-
-    abortListener = () => {
-      timedOut = true;
-      stderr = appendLimited(
-        stderr,
-        `${stderr ? "\n" : ""}agent-skill-evals: command interrupted`,
-        stderrLimit,
-      );
-      killProcessGroup(child, "SIGKILL");
-      finish({
-        command,
-        args: [...args],
-        exitCode: -1,
-        signal: "SIGKILL",
-        stdout,
-        stderr,
-        startedAt,
-        timedOut,
+      resolve({
+        ...result,
+        durationMs: Date.now() - startedAt,
       });
     };
-    signal.addEventListener("abort", abortListener, { once: true });
 
     child.stdout?.on("data", (chunk) => {
       const text = chunk.toString();
@@ -242,6 +176,5 @@ function nodeRunCommandEffect(
         }, KILL_GRACE_MS);
       }, options.timeoutMs);
     }
-  });
   });
 }
