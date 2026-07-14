@@ -23,7 +23,7 @@ features:
   - title: Check the skill first
     details: Find unclear activation text, missing files, and broken tests before you run an agent.
   - title: Prove it with evidence
-    details: Assertions read changed files, tool calls, skill loading, token usage, and multi-turn conversations — not the agent's own summary.
+    details: Check file outcomes and allowed change scope, tool calls, skill loading, output, turns, and token usage — not the agent's own summary.
 ---
 
 ::: tip Promptfoo is the test runner
@@ -32,11 +32,11 @@ features:
 
 ## How It Works
 
-Use `agent-skill-evals check` for cheap static validation, then use `promptfoo eval` to run the agent and grade recorded evidence. There is no separate eval runner.
+Use `agent-skill-evals init` to scaffold the Promptfoo wiring and a starter Test Pack. Run `agent-skill-evals check` for cheap static validation, then use `promptfoo eval` to run the selected real agent and grade recorded evidence. There is no separate eval runner.
 
 ## What A Test Looks Like
 
-This example checks that an agent fixes the login redirect and only changes the intended file:
+This example checks that an agent fixes the login redirect and keeps any file changes within the intended scope:
 
 ```yaml
 skill: ../skills/bugfix-workflow

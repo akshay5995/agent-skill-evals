@@ -23,6 +23,8 @@ pnpm exec agent-skill-evals init --skill <path> --adapter <codex|claude-code|pi>
 
 Adapt the command to the detected manager, such as `npx agent-skill-evals` for npm. Treat CLI help and generated files as the interface; source and built bundles are outside the setup path.
 
+Confirm the selected Codex, Claude Code, or Pi CLI is installed and authenticated before the runtime eval. Package installation supplies the eval integration, not the agent executable or its credentials. For Claude Code, require `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token` or `ANTHROPIC_API_KEY`; the isolated runtime cannot reuse a macOS Keychain login.
+
 Complete when the generated config imports the package's public entry points and `promptfoo eval` remains the runtime command.
 
 ## 3. Red
@@ -67,7 +69,9 @@ pnpm exec promptfoo eval
 
 On failure, inspect `evidence.json`, the retained World, and verifier output before changing the test. Strengthen the product or its evidence boundary; preserve the target skill's intended behavior.
 
-Complete when static checks pass, the generated runtime eval passes with an authenticated supported CLI, and the run stays within its existing token budget. Treat a budget failure as an efficiency regression to minimize; preserve the ceiling while removing unnecessary turns and context. If no authenticated CLI is available, report runtime validation as pending rather than complete.
+After a representative runtime pass, read the recorded token usage. If the Test Pack has no budget, set a fixed ceiling from that observed run and rerun the eval; if a budget already exists, preserve it. Treat a budget failure as an efficiency regression to minimize by removing unnecessary turns and context rather than raising the ceiling by default.
+
+Complete when static checks pass, the generated runtime eval passes with an authenticated supported CLI, and the rerun stays within a fixed token ceiling. If no authenticated CLI is available, report runtime validation and budget calibration as pending rather than complete.
 
 ## Product boundary
 
