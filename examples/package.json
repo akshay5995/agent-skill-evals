@@ -14,6 +14,6 @@
     "agent-skill-evals": "workspace:*"
   },
   "devDependencies": {
-    "promptfoo": "^0.121.13"
+    "promptfoo": "^0.121.18"
   }
 }

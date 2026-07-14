@@ -29,7 +29,7 @@
     "zod": "^4.4.3"
   },
   "peerDependencies": {
-    "promptfoo": "^0.121.13"
+    "promptfoo": "^0.121.18"
   },
   "devDependencies": {
     "tsx": "^4.22.0",
