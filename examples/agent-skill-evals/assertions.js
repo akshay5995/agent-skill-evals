@@ -1,2 +1,1 @@
-export { default } from "agent-skill-evals/assertions";
-export * from "agent-skill-evals/assertions";
+import("agent-skill-evals/assertions").then(({ default: grade }) => grade(output, context))

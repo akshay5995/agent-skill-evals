@@ -1,6 +1,3 @@
-import * as Effect from "effect/Effect";
-import * as Stream from "effect/Stream";
-
 interface JsonlState {
   leftover: string;
   events: unknown[];
@@ -43,19 +40,10 @@ export function createJsonlEventParser(): JsonlEventParser {
   };
 }
 
-export function parseJsonlChunksEffect(
-  chunks: Iterable<string>,
-): Effect.Effect<unknown[]> {
-  return Stream.fromIterable(chunks).pipe(
-    Stream.runFold({ leftover: "", events: [] } satisfies JsonlState, parseChunk),
-    Effect.map((state) => ({
-      ...state,
-      events: appendLine(state.events, state.leftover),
-    })),
-    Effect.map((state) => state.events),
-  );
-}
-
 export function parseJsonlChunks(chunks: Iterable<string>): unknown[] {
-  return Effect.runSync(parseJsonlChunksEffect(chunks));
+  let state: JsonlState = { leftover: "", events: [] };
+  for (const chunk of chunks) {
+    state = parseChunk(state, chunk);
+  }
+  return appendLine(state.events, state.leftover);
 }

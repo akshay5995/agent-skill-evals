@@ -1,0 +1,871 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://akshay5995.github.io/agent-skill-evals/schema/test-pack.schema.json",
+  "type": "object",
+  "properties": {
+    "skill": {
+      "$ref": "#/definitions/__schema0"
+    },
+    "supporting_skills": {
+      "$ref": "#/definitions/__schema1"
+    },
+    "distractor_skills": {
+      "$ref": "#/definitions/__schema2"
+    },
+    "builtin_distractor": {
+      "$ref": "#/definitions/__schema3"
+    },
+    "environment": {
+      "$ref": "#/definitions/__schema4"
+    },
+    "tests": {
+      "$ref": "#/definitions/__schema6"
+    }
+  },
+  "required": [
+    "skill",
+    "tests"
+  ],
+  "definitions": {
+    "__schema0": {
+      "type": "string",
+      "minLength": 1
+    },
+    "__schema1": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/__schema0"
+      }
+    },
+    "__schema2": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/__schema0"
+      }
+    },
+    "__schema3": {
+      "default": true,
+      "type": "boolean"
+    },
+    "__schema4": {
+      "type": "object",
+      "properties": {
+        "mocks": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/__schema5"
+          }
+        }
+      }
+    },
+    "__schema5": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "$ref": "#/definitions/__schema0"
+            },
+            "kind": {
+              "type": "string",
+              "const": "mcp"
+            },
+            "transport": {
+              "default": "stdio",
+              "type": "string",
+              "enum": [
+                "stdio",
+                "http"
+              ]
+            },
+            "command": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/__schema0"
+                }
+              ]
+            },
+            "args": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "url": {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/__schema0"
+                }
+              ]
+            },
+            "env": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "provides_skill_evidence": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name",
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "$ref": "#/definitions/__schema0"
+            },
+            "kind": {
+              "type": "string",
+              "const": "http"
+            },
+            "command": {
+              "$ref": "#/definitions/__schema0"
+            },
+            "args": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "env": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "ready": {
+              "default": {
+                "path": "/health"
+              },
+              "type": "object",
+              "properties": {
+                "path": {
+                  "default": "/health",
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/__schema0"
+                    }
+                  ]
+                },
+                "timeout_ms": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              }
+            },
+            "expose_as": {
+              "$ref": "#/definitions/__schema0"
+            }
+          },
+          "required": [
+            "name",
+            "kind",
+            "command",
+            "expose_as"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "$ref": "#/definitions/__schema0"
+            },
+            "kind": {
+              "type": "string",
+              "const": "command"
+            },
+            "executable": {
+              "$ref": "#/definitions/__schema0"
+            }
+          },
+          "required": [
+            "name",
+            "kind",
+            "executable"
+          ]
+        }
+      ]
+    },
+    "__schema6": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/__schema7"
+      }
+    },
+    "__schema7": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "mode": {
+          "default": "behavior",
+          "type": "string",
+          "enum": [
+            "behavior",
+            "routing"
+          ]
+        },
+        "prompt": {
+          "$ref": "#/definitions/__schema0"
+        },
+        "fixture": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/__schema0"
+            }
+          ]
+        },
+        "setup": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/__schema0"
+          }
+        },
+        "supporting_skills": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/__schema0"
+          }
+        },
+        "distractor_skills": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/__schema0"
+          }
+        },
+        "preconditions": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/__schema8"
+          }
+        },
+        "expect": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/__schema8"
+          }
+        },
+        "conversation": {
+          "type": "object",
+          "properties": {
+            "max_turns": {
+              "$ref": "#/definitions/__schema16"
+            },
+            "scripted_user": {
+              "$ref": "#/definitions/__schema17"
+            },
+            "simulated_user": {
+              "$ref": "#/definitions/__schema18"
+            }
+          }
+        },
+        "budget": {
+          "type": "object",
+          "properties": {
+            "max_total_tokens": {
+              "$ref": "#/definitions/__schema19"
+            },
+            "max_prompt_tokens": {
+              "$ref": "#/definitions/__schema20"
+            },
+            "max_completion_tokens": {
+              "$ref": "#/definitions/__schema21"
+            },
+            "max_cached_tokens": {
+              "$ref": "#/definitions/__schema22"
+            }
+          }
+        },
+        "promptfoo": {
+          "type": "object",
+          "properties": {
+            "assert": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            }
+          }
+        },
+        "environment": {
+          "type": "object",
+          "properties": {
+            "mocks": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/__schema5"
+              }
+            }
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "prompt",
+        "expect"
+      ]
+    },
+    "__schema8": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "verifier.succeeds": {
+              "$ref": "#/definitions/__schema9"
+            }
+          },
+          "required": [
+            "verifier.succeeds"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "verifier.fails": {
+              "$ref": "#/definitions/__schema9"
+            }
+          },
+          "required": [
+            "verifier.fails"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "file.exists": {
+              "$ref": "#/definitions/__schema11"
+            }
+          },
+          "required": [
+            "file.exists"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "file.created": {
+              "$ref": "#/definitions/__schema11"
+            }
+          },
+          "required": [
+            "file.created"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "file.contains": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "$ref": "#/definitions/__schema10"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "text"
+              ]
+            }
+          },
+          "required": [
+            "file.contains"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "file.unchanged": {
+              "$ref": "#/definitions/__schema11"
+            }
+          },
+          "required": [
+            "file.unchanged"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "file.changes_within": {
+              "type": "object",
+              "properties": {
+                "paths": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/__schema10"
+                  }
+                }
+              },
+              "required": [
+                "paths"
+              ]
+            }
+          },
+          "required": [
+            "file.changes_within"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tool.called": {
+              "type": "object",
+              "properties": {
+                "tool": {
+                  "$ref": "#/definitions/__schema10"
+                },
+                "provider": {
+                  "$ref": "#/definitions/__schema12"
+                },
+                "server": {
+                  "$ref": "#/definitions/__schema12"
+                },
+                "args_match": {}
+              },
+              "required": [
+                "tool"
+              ]
+            }
+          },
+          "required": [
+            "tool.called"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tool.not_called": {
+              "allOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "tool": {
+                      "$ref": "#/definitions/__schema13"
+                    },
+                    "provider": {
+                      "$ref": "#/definitions/__schema13"
+                    },
+                    "server": {
+                      "$ref": "#/definitions/__schema13"
+                    },
+                    "args_match": {
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/__schema14"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "tool": {
+                          "$ref": "#/definitions/__schema10"
+                        }
+                      },
+                      "required": [
+                        "tool"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "$ref": "#/definitions/__schema10"
+                        }
+                      },
+                      "required": [
+                        "provider"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "server": {
+                          "$ref": "#/definitions/__schema10"
+                        }
+                      },
+                      "required": [
+                        "server"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "args_match": {
+                          "$ref": "#/definitions/__schema14"
+                        }
+                      },
+                      "required": [
+                        "args_match"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "tool.not_called"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tool.count": {
+              "type": "object",
+              "properties": {
+                "tool": {
+                  "$ref": "#/definitions/__schema12"
+                },
+                "provider": {
+                  "$ref": "#/definitions/__schema12"
+                },
+                "server": {
+                  "$ref": "#/definitions/__schema12"
+                },
+                "args_match": {},
+                "turn": {
+                  "type": "number"
+                },
+                "before_turn": {
+                  "type": "number"
+                },
+                "after_turn": {
+                  "type": "number"
+                },
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "required": [
+            "tool.count"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tool.sequence": {
+              "type": "object",
+              "properties": {
+                "order": {
+                  "minItems": 2,
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/__schema10"
+                  }
+                }
+              },
+              "required": [
+                "order"
+              ]
+            }
+          },
+          "required": [
+            "tool.sequence"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "turn.count": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "required": [
+            "turn.count"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "skill.loaded": {
+              "$ref": "#/definitions/__schema15"
+            }
+          },
+          "required": [
+            "skill.loaded"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "skill.not_loaded": {
+              "$ref": "#/definitions/__schema15"
+            }
+          },
+          "required": [
+            "skill.not_loaded"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "output.contains": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text"
+              ]
+            }
+          },
+          "required": [
+            "output.contains"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "output.matches": {
+              "type": "object",
+              "properties": {
+                "pattern": {
+                  "$ref": "#/definitions/__schema10"
+                },
+                "flags": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "pattern"
+              ]
+            }
+          },
+          "required": [
+            "output.matches"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "__schema9": {
+      "type": "object",
+      "properties": {
+        "run": {
+          "$ref": "#/definitions/__schema10"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "timeoutMs": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "run"
+      ]
+    },
+    "__schema10": {
+      "type": "string",
+      "minLength": 1
+    },
+    "__schema11": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "$ref": "#/definitions/__schema10"
+        }
+      },
+      "required": [
+        "path"
+      ]
+    },
+    "__schema12": {
+      "type": "string"
+    },
+    "__schema13": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/__schema10"
+        }
+      ]
+    },
+    "__schema14": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {}
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      ]
+    },
+    "__schema15": {
+      "type": "object",
+      "properties": {
+        "skills": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/__schema10"
+          }
+        },
+        "delivery": {
+          "type": "string",
+          "enum": [
+            "native",
+            "mcp"
+          ]
+        },
+        "provider": {
+          "$ref": "#/definitions/__schema12"
+        },
+        "server": {
+          "$ref": "#/definitions/__schema12"
+        },
+        "source": {
+          "$ref": "#/definitions/__schema12"
+        }
+      },
+      "required": [
+        "skills"
+      ]
+    },
+    "__schema16": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20
+    },
+    "__schema17": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/__schema0"
+      }
+    },
+    "__schema18": {
+      "type": "object",
+      "properties": {
+        "goal": {
+          "$ref": "#/definitions/__schema0"
+        },
+        "persona": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/__schema0"
+            }
+          ]
+        },
+        "allow_mocks": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "goal"
+      ]
+    },
+    "__schema19": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "__schema20": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "__schema21": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "__schema22": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  }
+}

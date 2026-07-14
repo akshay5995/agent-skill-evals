@@ -1,38 +1,25 @@
 import { join } from "node:path";
-import * as Effect from "effect/Effect";
+import { writeFile } from "node:fs/promises";
 import type {
   EvidenceHandle,
   FileEvent,
   SkillLoadEvent,
+  SkillAvailableEvent,
   ToolCallEvent,
   Usage,
   CommandEvent,
 } from "../internal-types.js";
 import {
   EVIDENCE_SCHEMA_VERSION,
+  parseEvidenceSnapshot,
   type EvidenceSnapshot,
-} from "../evidence-types.js";
-import { parseEvidenceSnapshot } from "../evidence-schema.js";
-import { FileSystem, NodeServicesLive } from "../internal-services.js";
+  type RuntimeIdentity,
+  type TurnRecord,
+} from "../evidence-schema.js";
+import type { SkillEvidenceConfig } from "./provider-config.js";
 
 export type { EvidenceSnapshot };
-
-export interface SkillEvidenceConfig {
-  mcpResource?: {
-    uriArgPaths?: readonly string[];
-    uriPatterns?: readonly string[];
-  };
-  mcpTool?: {
-    toolPatterns?: readonly string[];
-  };
-  nativeArgs?: {
-    whenArgs?: readonly string[];
-    whenAnyArgs?: readonly string[];
-    skillPathFlags?: readonly string[];
-    provider?: string;
-    source?: string;
-  };
-}
+export type { SkillEvidenceConfig } from "./provider-config.js";
 
 const DEFAULT_SKILL_EVIDENCE_CONFIG = {
   mcpResource: {
@@ -46,6 +33,9 @@ const DEFAULT_SKILL_EVIDENCE_CONFIG = {
 
 export class EvidenceCollector {
   private readonly skillEvidenceConfig: SkillEvidenceConfig;
+  private currentTurn?: number;
+  /** Usage from completed turns; the live snapshot.usage covers only the current turn. */
+  private completedTurnsUsage: Usage = {};
   private snapshot: EvidenceSnapshot = {
     schemaVersion: EVIDENCE_SCHEMA_VERSION,
     output: "",
@@ -58,6 +48,7 @@ export class EvidenceCollector {
     filesWritten: [],
     toolCalls: [],
     skillsLoaded: [],
+    skillsAvailable: [],
     usage: {},
   };
 
@@ -66,7 +57,7 @@ export class EvidenceCollector {
   }
 
   addCommand(e: CommandEvent): void {
-    this.snapshot.commands.push(e);
+    this.snapshot.commands.push(this.withTurn(e));
   }
 
   addFileWrite(e: FileEvent): void {
@@ -74,9 +65,47 @@ export class EvidenceCollector {
   }
 
   addToolCall(e: ToolCallEvent): void {
-    this.snapshot.toolCalls.push(e);
-    const skillLoad = skillLoadFromToolCall(e, this.skillEvidenceConfig);
+    const event = this.withTurn(e);
+    this.snapshot.toolCalls.push(event);
+    const skillLoad = skillLoadFromToolCall(event, this.skillEvidenceConfig);
     if (skillLoad) this.addSkillLoad(skillLoad);
+  }
+
+  private withTurn<T extends { turn?: number }>(event: T): T {
+    return this.currentTurn === undefined ? event : { ...event, turn: this.currentTurn };
+  }
+
+  /**
+   * Start an agent turn in a multi-turn run. Adapters overwrite usage per
+   * CLI invocation (setUsage), so each turn's usage is scoped: the previous
+   * turn's counts move into the completed-turns total first.
+   */
+  beginAgentTurn(turn: number): void {
+    this.completedTurnsUsage = mergeUsage(this.completedTurnsUsage, this.snapshot.usage);
+    this.snapshot.usage = {};
+    this.currentTurn = turn;
+  }
+
+  endAgentTurn(record: { text: string; startedAt: number; durationMs: number }): void {
+    if (this.currentTurn === undefined) return;
+    this.addTurnRecord({
+      turn: this.currentTurn,
+      role: "agent",
+      text: record.text,
+      startedAt: record.startedAt,
+      durationMs: record.durationMs,
+      usage: { ...this.snapshot.usage },
+    });
+  }
+
+  addUserTurn(turn: number, text: string, startedAt: number): void {
+    this.addTurnRecord({ turn, role: "user", text, startedAt, durationMs: 0 });
+  }
+
+  private addTurnRecord(record: TurnRecord): void {
+    const turns = this.snapshot.turns ?? [];
+    turns.push(record);
+    this.snapshot.turns = turns;
   }
 
   addSkillLoad(e: SkillLoadEvent): void {
@@ -90,8 +119,32 @@ export class EvidenceCollector {
     this.snapshot.skillsLoaded.push(e);
   }
 
+  addSkillAvailable(e: SkillAvailableEvent): void {
+    if (!this.snapshot.skillsAvailable.some((existing) => existing.skill === e.skill && existing.path === e.path)) {
+      this.snapshot.skillsAvailable.push(e);
+    }
+  }
+
   setUsage(u: Usage): void {
     this.snapshot.usage = u;
+  }
+
+  /** Merge non-empty runtime identity fields; later observations win. */
+  mergeRuntime(identity: RuntimeIdentity): void {
+    const merged: RuntimeIdentity = { ...this.snapshot.runtime };
+    for (const [key, value] of Object.entries(identity)) {
+      if (typeof value === "string" && value.length > 0) {
+        (merged as Record<string, unknown>)[key] = value;
+      }
+    }
+    if (Object.keys(merged).length > 0) this.snapshot.runtime = merged;
+  }
+
+  addWarning(warning: string): void {
+    const warnings = this.snapshot.warnings ?? [];
+    if (warnings.includes(warning)) return;
+    warnings.push(warning);
+    this.snapshot.warnings = warnings;
   }
 
   addUsage(u: Usage): void {
@@ -115,14 +168,15 @@ export class EvidenceCollector {
       filesWritten: [...this.snapshot.filesWritten],
       toolCalls: [...this.snapshot.toolCalls],
       skillsLoaded: [...this.snapshot.skillsLoaded],
-      usage: { ...this.snapshot.usage },
+      skillsAvailable: [...this.snapshot.skillsAvailable],
+      usage: mergeUsage(this.completedTurnsUsage, this.snapshot.usage),
+      turns: this.snapshot.turns ? this.snapshot.turns.map((t) => ({ ...t })) : undefined,
+      runtime: this.snapshot.runtime ? { ...this.snapshot.runtime } : undefined,
+      warnings: this.snapshot.warnings ? [...this.snapshot.warnings] : undefined,
       extensions: this.snapshot.extensions ? { ...this.snapshot.extensions } : undefined,
     });
   }
 
-  async writeTo(runDir: string): Promise<string> {
-    return Effect.runPromise(writeEvidenceToEffect(this, runDir).pipe(Effect.provide(NodeServicesLive)));
-  }
 
   static fromSnapshot(snapshot: EvidenceSnapshot): EvidenceCollector {
     const collector = new EvidenceCollector();
@@ -223,24 +277,26 @@ function mergeUsage(a: Usage, b: Usage): Usage {
   };
 }
 
-export function writeEvidenceToEffect(
+export async function writeEvidenceTo(
   collector: EvidenceCollector,
   runDir: string,
-): Effect.Effect<string, unknown, FileSystem> {
-  return Effect.gen(function* () {
-    const fs = yield* FileSystem;
-    const path = join(runDir, "evidence.json");
-    yield* fs.writeText(path, JSON.stringify(collector.toSnapshot(), null, 2));
-    return path;
-  });
+): Promise<string> {
+  const path = join(runDir, "evidence.json");
+  await writeFile(path, JSON.stringify(collector.toSnapshot(), null, 2));
+  return path;
 }
 
 export function evidenceFromSnapshot(s: EvidenceSnapshot): EvidenceHandle {
   return {
+    output: () => s.output,
     commands: () => s.commands,
     filesWritten: () => s.filesWritten,
     toolCalls: () => s.toolCalls,
     skillsLoaded: () => s.skillsLoaded,
+    skillsAvailable: () => s.skillsAvailable,
     usage: () => s.usage,
+    turns: () => s.turns ?? [],
+    runtime: () => s.runtime ?? {},
+    warnings: () => s.warnings ?? [],
   };
 }

@@ -10,7 +10,7 @@ to make those evals useful.
 ## Repo Map
 
 - `packages/promptfoo/`: the `agent-skill-evals` package. Its public entry
-  points are `./agent`, `./skill-checks`, and `./assertions`.
+  points are `./agent`, `./assertions`, and `./test-generator`.
 - `examples/`: the public runnable workspace for real skills, real Promptfoo
   configs, sample projects, fixtures, and adapter evals.
 - `docs/`: VitePress documentation. Keep it user-facing and grounded in current
@@ -54,6 +54,11 @@ Use the smallest command that covers the change:
 - `pnpm run eval:real` for manual real-adapter verification across available
   Codex, Claude, and Pi CLIs.
 
+The deterministic suite covers evidence normalization plus HTTP and command mock
+wiring. Real-adapter claims require `eval:real` evidence. Changes to the meta skill
+also require dogfooding it in a fresh packed consumer: its generated static check,
+runtime eval, and fixed token ceiling must all pass.
+
 For eval failures, inspect `evidence.json` and Promptfoo logs before claiming the
 agent failed. Promptfoo summaries are often less useful than the recorded
 evidence.
@@ -61,8 +66,6 @@ evidence.
 ## Useful Pointers
 
 - Public overview: `README.md`
-- Package contract: `docs/guide/package-map.md`
 - First setup path: `docs/guide/getting-started.md`
-- Runtime/evidence model: `docs/guide/core-concepts.md` and
-  `docs/guide/runtime-checks.md`
-- Routing evidence: `docs/guide/routing-evals.md`
+- Everything else (checks, metrics, config, evidence, routing):
+  `docs/guide/reference.md`

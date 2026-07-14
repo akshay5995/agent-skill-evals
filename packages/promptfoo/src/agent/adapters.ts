@@ -1,9 +1,7 @@
 import { isAbsolute, relative } from "node:path";
-import * as Clock from "effect/Clock";
-import * as Effect from "effect/Effect";
 import type { EvidenceCollector } from "./evidence.js";
 import type { CommandEvent, ToolCallEvent, Usage } from "../internal-types.js";
-import { ProcessRunner, runCommandEffect } from "./command-runner.js";
+import { runCommand } from "./command-runner.js";
 import { createJsonlEventParser } from "./jsonl-stream.js";
 
 export interface AdapterRunInput {
@@ -26,11 +24,13 @@ export interface AdapterRunResult {
 
 export interface Adapter {
   id: string;
-  run(input: AdapterRunInput): Effect.Effect<AdapterRunResult, never, ProcessRunner>;
+  run(input: AdapterRunInput): Promise<AdapterRunResult>;
 }
 
 interface JsonlAdapterOptions {
   promptDelivery?: "stdin" | "arg";
+  adapterId?: string;
+  terminalError?: (event: unknown) => string | undefined;
 }
 
 interface EvidenceSink {
@@ -38,8 +38,23 @@ interface EvidenceSink {
   addToolCall(e: ToolCallEvent): void;
   setUsage(u: Usage): void;
   addUsage(u: Usage): void;
+  setModel?(model: string): void;
   now?: () => number;
 }
+
+const pendingPiToolCalls = new WeakMap<EvidenceSink, ToolCallEvent[]>();
+
+/**
+ * Event handlers return true when they recognize the event's type — consumed
+ * or deliberately ignored. Unrecognized types are counted per run and
+ * surfaced as an evidence warning: CLIs change their output schemas without
+ * notice, and a silent parse miss would otherwise corrupt evidence.
+ */
+type EventHandler = (
+  evt: unknown,
+  evidence: EvidenceSink,
+  appendFinal: (s: string, replace?: boolean) => void,
+) => boolean;
 
 function argsWithPrompt(args: readonly string[], prompt: string): string[] {
   const dashIndex = args.lastIndexOf("-");
@@ -105,6 +120,7 @@ function evidenceWithRelativeToolPaths(
     },
     setUsage: (usage) => evidence.setUsage(usage),
     addUsage: (usage) => evidence.addUsage(usage),
+    setModel: (model) => evidence.mergeRuntime({ model }),
     now,
   };
 }
@@ -152,61 +168,83 @@ function evidenceStartedAt(evidence: EvidenceSink): number {
   return evidence.now?.() ?? 0;
 }
 
-function runJsonlAdapter(
+async function runJsonlAdapter(
   input: AdapterRunInput,
-  onEvent: (evt: unknown, evidence: EvidenceSink, appendFinal: (s: string) => void) => void,
+  onEvent: EventHandler,
   options: JsonlAdapterOptions = {},
-): Effect.Effect<AdapterRunResult, never, ProcessRunner> {
+): Promise<AdapterRunResult> {
   const { command, args, cwd, prompt, evidence, timeoutMs, env } = input;
   const promptDelivery = options.promptDelivery ?? "stdin";
   const spawnArgs = promptDelivery === "arg" ? argsWithPrompt(args, prompt) : [...args];
-  return Effect.gen(function* () {
-    const runStartedAt = yield* Clock.currentTimeMillis;
-    const adapterEvidence = evidenceWithRelativeToolPaths(evidence, cwd, () => runStartedAt);
-    const parser = createJsonlEventParser();
-    let finalText = "";
-    const handleChunk = (chunk: string) => {
-      for (const evt of parser.push(chunk)) {
-        onEvent(evt, adapterEvidence, (text) => (finalText += text));
-      }
-    };
-
-    const result = yield* runCommandEffect(command, spawnArgs, {
-      cwd,
-      env,
-      stdin: promptDelivery === "stdin" ? prompt : undefined,
-      timeoutMs,
-      stdoutLimit: 0,
-      onStdout: handleChunk,
+  const runStartedAt = Date.now();
+  const adapterEvidence = evidenceWithRelativeToolPaths(evidence, cwd, () => runStartedAt);
+  const parser = createJsonlEventParser();
+  const unrecognized = new Map<string, number>();
+  let finalText = "";
+  let terminalError: string | undefined;
+  const dispatch = (evt: unknown) => {
+    terminalError = options.terminalError?.(evt) ?? terminalError;
+    const recognized = onEvent(evt, adapterEvidence, (text, replace = false) => {
+      finalText = replace ? text : finalText + text;
     });
-
-    for (const evt of parser.finish()) {
-      onEvent(evt, adapterEvidence, (text) => (finalText += text));
+    if (recognized) return;
+    const type =
+      evt && typeof evt === "object" && typeof (evt as { type?: unknown }).type === "string"
+        ? (evt as { type: string }).type
+        : "<no type>";
+    unrecognized.set(type, (unrecognized.get(type) ?? 0) + 1);
+  };
+  const handleChunk = (chunk: string) => {
+    for (const evt of parser.push(chunk)) {
+      dispatch(evt);
     }
-    evidence.addCommand({
-      command,
-      args: [...spawnArgs],
-      exitCode: result.exitCode,
-      stderr: result.stderr.slice(0, 4096),
-      startedAt: result.startedAt,
-      durationMs: result.durationMs,
-    });
-    const error = result.error
-      ? `adapter error: failed to start "${command}": ${result.error.message}`
-      : result.timedOut
-        ? `${command} timed out after ${timeoutMs ?? 0}ms`
-        : result.exitCode !== 0
-          ? `${command} exited ${result.exitCode}${result.stderr.trim() ? `: ${result.stderr.trim()}` : ""}`
-          : undefined;
-    if (error && !finalText.trim()) finalText = error;
-    return {
-      output: finalText.trim(),
-      exitCode: result.exitCode,
-      timedOut: result.timedOut,
-      ...(error ? { error } : {}),
-      durationMs: result.durationMs,
-    };
+  };
+
+  const result = await runCommand(command, spawnArgs, {
+    cwd,
+    env,
+    stdin: promptDelivery === "stdin" ? prompt : undefined,
+    timeoutMs,
+    stdoutLimit: 0,
+    onStdout: handleChunk,
   });
+
+  for (const evt of parser.finish()) {
+    dispatch(evt);
+  }
+  if (unrecognized.size > 0) {
+    const summary = [...unrecognized.entries()]
+      .map(([type, count]) => `${type} (${count})`)
+      .join(", ");
+    evidence.addWarning(
+      `${options.adapterId ?? "adapter"}: unrecognized event type(s) in CLI output: ${summary}. ` +
+        "The CLI's JSON schema may have changed since this adapter was written; " +
+        "recorded evidence may be incomplete.",
+    );
+  }
+  evidence.addCommand({
+    command,
+    args: [...spawnArgs],
+    exitCode: result.exitCode,
+    stderr: result.stderr.slice(0, 4096),
+    startedAt: result.startedAt,
+    durationMs: result.durationMs,
+  });
+  const error = result.error
+    ? `adapter error: failed to start "${command}": ${result.error.message}`
+    : result.timedOut
+      ? `${command} timed out after ${timeoutMs ?? 0}ms`
+      : result.exitCode !== 0
+        ? `${command} exited ${result.exitCode}${result.stderr.trim() ? `: ${result.stderr.trim()}` : ""}`
+        : terminalError;
+  if (error && !finalText.trim()) finalText = error;
+  return {
+    output: finalText.trim(),
+    exitCode: result.exitCode,
+    timedOut: result.timedOut,
+    ...(error ? { error } : {}),
+    durationMs: result.durationMs,
+  };
 }
 
 /**
@@ -219,44 +257,87 @@ function runJsonlAdapter(
  */
 export const claudeCodeJsonAdapter: Adapter = {
   id: "claude-code-json",
-  run(input) {
-    return runJsonlAdapter(input, handleClaudeEvent);
+  async run(input) {
+    const result = await runJsonlAdapter(input, handleClaudeEvent, { adapterId: "claude-code-json" });
+    if (result.exitCode !== 0 && /not logged in/i.test(result.output)) {
+      const hint =
+        "Claude Code runs with an isolated HOME and cannot reuse a macOS Keychain login. " +
+        "Set CLAUDE_CODE_OAUTH_TOKEN (created by `claude setup-token`) or ANTHROPIC_API_KEY.";
+      return {
+        ...result,
+        output: `${result.output}\n\n${hint}`,
+        error: `${result.error ?? "Claude Code authentication failed"}. ${hint}`,
+      };
+    }
+    return result;
   },
 };
 
 export const codexJsonAdapter: Adapter = {
   id: "codex-json",
   run(input) {
-    return runJsonlAdapter(input, handleCodexEvent, { promptDelivery: "arg" });
+    return runJsonlAdapter(input, handleCodexEvent, {
+      promptDelivery: "arg",
+      adapterId: "codex-json",
+    });
   },
 };
 
 export const piJsonAdapter: Adapter = {
   id: "pi-json",
-  run(input) {
-    return runJsonlAdapter(input, handlePiEvent);
+  async run(input) {
+    const result = await runJsonlAdapter(input, handlePiEvent, {
+      adapterId: "pi-json",
+      terminalError: piTerminalError,
+    });
+    if (result.error && /no api key for provider/i.test(result.error)) {
+      return {
+        ...result,
+        error: `Pi authentication failed: ${result.error}`,
+      };
+    }
+    return result;
   },
 };
 
-export const internalTestJsonAdapter: Adapter = {
-  id: "internal-test-json",
-  run(input) {
-    return runJsonlAdapter(input, handleCodexEvent);
-  },
-};
+function piTerminalError(event: unknown): string | undefined {
+  if (!event || typeof event !== "object") return undefined;
+  const message = (event as { message?: unknown }).message;
+  if (!message || typeof message !== "object") return undefined;
+  const terminal = message as { stopReason?: unknown; errorMessage?: unknown };
+  return terminal.stopReason === "error" && typeof terminal.errorMessage === "string"
+    ? terminal.errorMessage
+    : undefined;
+}
+
+/** Event types Claude Code's stream-json output is known to emit. */
+const CLAUDE_KNOWN_EVENT_TYPES = new Set([
+  "system",
+  "assistant",
+  "user",
+  "result",
+  "stream_event",
+  "rate_limit_event",
+]);
 
 export function handleClaudeEvent(
   evt: unknown,
   evidence: EvidenceSink,
-  appendFinal: (s: string) => void,
-): void {
-  if (!evt || typeof evt !== "object") return;
-  const e = evt as { type?: string; message?: unknown; result?: unknown; usage?: unknown };
+  appendFinal: (s: string, replace?: boolean) => void,
+): boolean {
+  if (!evt || typeof evt !== "object") return false;
+  const e = evt as { type?: string; message?: unknown; result?: unknown; usage?: unknown; model?: unknown };
+  if (e.type === "system" && typeof e.model === "string") {
+    evidence.setModel?.(e.model);
+  }
   if (e.type === "result" && typeof e.result === "string") {
     appendFinal(e.result);
   }
   if (e.type === "assistant" && e.message && typeof e.message === "object") {
-    const msg = e.message as { content?: unknown; usage?: unknown };
+    const msg = e.message as { content?: unknown; usage?: unknown; model?: unknown };
+    if (typeof msg.model === "string") {
+      evidence.setModel?.(msg.model);
+    }
     if (msg.usage && typeof msg.usage === "object") {
       evidence.addUsage(normalizeUsage(msg.usage as Record<string, number>));
     }
@@ -264,9 +345,6 @@ export function handleClaudeEvent(
       for (const block of msg.content) {
         if (!block || typeof block !== "object") continue;
         const b = block as { type?: string; text?: string; name?: string; input?: unknown };
-        if (b.type === "text" && typeof b.text === "string") {
-          appendFinal(b.text);
-        }
         if (b.type === "tool_use" && typeof b.name === "string") {
           evidence.addToolCall({
             tool: b.name,
@@ -282,16 +360,29 @@ export function handleClaudeEvent(
   if (e.type === "result" && e.usage && typeof e.usage === "object") {
     evidence.setUsage(normalizeUsage(e.usage as Record<string, number>));
   }
+  return typeof e.type === "string" && CLAUDE_KNOWN_EVENT_TYPES.has(e.type);
 }
+
+/**
+ * Codex lifecycle event families that carry no evidence but are normal
+ * output — recognized so they do not trigger schema-drift warnings.
+ */
+const CODEX_KNOWN_TYPE_PATTERN =
+  /^(thread|turn|session|item|task|agent|token_count|notification|status|reasoning|error|usage)([._:]|$)/;
 
 export function handleCodexEvent(
   evt: unknown,
   evidence: EvidenceSink,
   appendFinal: (s: string) => void,
-): void {
-  if (!evt || typeof evt !== "object") return;
+): boolean {
+  if (!evt || typeof evt !== "object") return false;
   const e = evt as Record<string, unknown>;
   const type = typeof e.type === "string" ? e.type : "";
+  let consumed = false;
+
+  if (typeof e.model === "string") {
+    evidence.setModel?.(e.model);
+  }
 
   const text =
     typeof e.message === "string" ? e.message :
@@ -301,6 +392,7 @@ export function handleCodexEvent(
     undefined;
   if (text && /message|final|result|response|output/.test(type)) {
     appendFinal(text);
+    consumed = true;
   }
 
   const item = e.item && typeof e.item === "object" ? e.item as Record<string, unknown> : e;
@@ -319,9 +411,11 @@ export function handleCodexEvent(
       startedAt: evidenceStartedAt(evidence),
       durationMs: 0,
     });
+    consumed = true;
   }
 
-  if (itemType === "file_change" && Array.isArray(item.changes)) {
+  const completedFileChangeEvent = type === "file_change" || type === "event" || /(?:completed|failed|result)$/.test(type);
+  if (completedFileChangeEvent && itemType === "file_change" && Array.isArray(item.changes)) {
     for (const change of item.changes) {
       if (!change || typeof change !== "object") continue;
       const c = change as { path?: unknown; kind?: unknown };
@@ -337,9 +431,13 @@ export function handleCodexEvent(
         durationMs: 0,
       });
     }
+    consumed = true;
   }
 
-  if ((type.includes("exec") || type.includes("command") || itemType.includes("command")) && typeof item.command === "string") {
+  const completedCommandEvent =
+    type === "exec_command" ||
+    /(?:completed|failed|result)$/.test(type);
+  if (completedCommandEvent && (type.includes("exec") || type.includes("command") || itemType.includes("command")) && typeof item.command === "string") {
     const args = Array.isArray(item.args) ? item.args.map(String) : [];
     evidence.addCommand({
       command: item.command,
@@ -350,30 +448,76 @@ export function handleCodexEvent(
       startedAt: evidenceStartedAt(evidence),
       durationMs: typeof item.durationMs === "number" ? item.durationMs : 0,
     });
+    consumed = true;
   }
 
   const usage = e.usage && typeof e.usage === "object" ? e.usage as Record<string, number> : undefined;
   if (usage) {
     evidence.setUsage(normalizeUsage(usage));
+    consumed = true;
   }
+  return consumed || CODEX_KNOWN_TYPE_PATTERN.test(type);
 }
+
+/** Pi lifecycle events that carry no evidence but are normal output. */
+const PI_KNOWN_EVENT_TYPES = new Set([
+  "message_start",
+  "message_update",
+  "message_end",
+  "turn_start",
+  "turn_end",
+  "agent_start",
+  "agent_end",
+  "tool_execution_start",
+  "tool_execution_update",
+  "tool_execution_end",
+  "session",
+  "thinking",
+  "usage",
+  "final",
+  "error",
+]);
 
 export function handlePiEvent(
   evt: unknown,
   evidence: EvidenceSink,
-  appendFinal: (s: string) => void,
-): void {
-  if (!evt || typeof evt !== "object") return;
+  appendFinal: (s: string, replace?: boolean) => void,
+): boolean {
+  if (!evt || typeof evt !== "object") return false;
   const e = evt as Record<string, unknown>;
   const type = typeof e.type === "string" ? e.type : "";
+  let consumed = false;
   const message = e.message && typeof e.message === "object"
     ? e.message as Record<string, unknown>
     : undefined;
+  if (typeof message?.model === "string") {
+    evidence.setModel?.(message.model);
+  }
   const messageUsage = message?.usage && typeof message.usage === "object"
     ? message.usage as Record<string, number>
     : undefined;
   if (messageUsage && (type === "message_end" || type === "turn_end" || type === "agent_end")) {
     evidence.setUsage(normalizeUsage(messageUsage));
+    consumed = true;
+  }
+
+  if (type === "message_end" && message?.role === "assistant" && Array.isArray(message.content)) {
+    let assistantText = "";
+    for (const block of message.content) {
+      if (!block || typeof block !== "object") continue;
+      const content = block as { type?: unknown; text?: unknown };
+      if (content.type === "text" && typeof content.text === "string") {
+        assistantText += content.text;
+      }
+    }
+    if (assistantText) {
+      appendFinal(assistantText, true);
+      consumed = true;
+    }
+    if (message.stopReason === "error" && typeof message.errorMessage === "string") {
+      appendFinal(message.errorMessage, true);
+      consumed = true;
+    }
   }
 
   const text =
@@ -385,6 +529,7 @@ export function handlePiEvent(
     undefined;
   if (text && /assistant|message|final|result|response|output/.test(type)) {
     appendFinal(text);
+    consumed = true;
   }
 
   if (type === "tool_execution_start" || type === "tool_execution_end") {
@@ -395,15 +540,32 @@ export function handlePiEvent(
       typeof e.toolName === "string" ? e.toolName :
       undefined;
     const tool = rawTool ? normalizePiToolName(rawTool) : undefined;
-    if (tool) {
-      evidence.addToolCall({
+    if (tool && type === "tool_execution_start") {
+      const pending = pendingPiToolCalls.get(evidence) ?? [];
+      pending.push({
         tool,
         provider: "pi-json",
         args: e.args ?? e.input ?? e.arguments,
-        result: type === "tool_execution_end" ? e.result ?? e.output : undefined,
         startedAt: evidenceStartedAt(evidence),
+        durationMs: 0,
+      });
+      pendingPiToolCalls.set(evidence, pending);
+      consumed = true;
+    }
+    if (tool && type === "tool_execution_end") {
+      const pending = pendingPiToolCalls.get(evidence) ?? [];
+      const index = pending.map((call) => call.tool).lastIndexOf(tool);
+      const started = index >= 0 ? pending.splice(index, 1)[0] : undefined;
+      if (pending.length === 0) pendingPiToolCalls.delete(evidence);
+      evidence.addToolCall({
+        tool,
+        provider: "pi-json",
+        args: e.args ?? e.input ?? e.arguments ?? started?.args,
+        result: e.result ?? e.output,
+        startedAt: started?.startedAt ?? evidenceStartedAt(evidence),
         durationMs: typeof e.duration_ms === "number" ? e.duration_ms : typeof e.durationMs === "number" ? e.durationMs : 0,
       });
+      consumed = true;
     }
   }
 
@@ -437,12 +599,13 @@ export function handlePiEvent(
     : e as Record<string, number>;
   if (type === "usage" || e.usage) {
     evidence.setUsage(normalizeUsage(usage));
+    consumed = true;
   }
+  return consumed || PI_KNOWN_EVENT_TYPES.has(type);
 }
 
 export const adapterRegistry: Map<string, Adapter> = new Map([
   [claudeCodeJsonAdapter.id, claudeCodeJsonAdapter],
   [codexJsonAdapter.id, codexJsonAdapter],
   [piJsonAdapter.id, piJsonAdapter],
-  [internalTestJsonAdapter.id, internalTestJsonAdapter],
 ]);

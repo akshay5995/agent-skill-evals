@@ -1,17 +1,18 @@
-import { describe, expect, it } from "vitest";
 import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import skillTest from "../skill-test.js";
+import { describe, expect, it } from "vitest";
 import { EvidenceCollector } from "../../agent/evidence.js";
+import skillTest from "../skill-test.js";
 
-function makeRun() {
+function makeRun(configure?: (evidence: EvidenceCollector) => void) {
   const runDir = mkdtempSync(join(tmpdir(), "agent-skill-evals-skill-test-"));
   const worldPath = join(runDir, "world");
   mkdirSync(worldPath, { recursive: true });
   const evidence = new EvidenceCollector();
-  evidence.setOutput("done");
-  evidence.setRun({ runDir, worldPath, fixture: "./fixture", durationMs: 1 });
+  evidence.setOutput("task completed safely");
+  evidence.setRun({ runDir, worldPath, durationMs: 1 });
+  configure?.(evidence);
   const evidencePath = join(runDir, "evidence.json");
   writeFileSync(evidencePath, JSON.stringify(evidence.toSnapshot(), null, 2));
   return {
@@ -21,7 +22,6 @@ function makeRun() {
       runDir,
       worldPath,
       evidencePath,
-      fixture: "./fixture",
       preconditionResults: [],
       preconditionsPassed: true,
       durationMs: 1,
@@ -29,338 +29,76 @@ function makeRun() {
   };
 }
 
-function makeRunWithEvidence(configure: (evidence: EvidenceCollector) => void) {
-  const run = makeRun();
-  const evidence = new EvidenceCollector();
-  evidence.setOutput("done");
-  evidence.setRun({
-    runDir: run.runDir,
-    worldPath: run.worldPath,
-    fixture: "./fixture",
-    durationMs: 1,
+async function grade(run: ReturnType<typeof makeRun>, expectEntries?: unknown[]) {
+  return skillTest("", {
+    providerResponse: { metadata: run.metadata },
+    vars: expectEntries === undefined ? {} : { expect: expectEntries },
   });
-  configure(evidence);
-  writeFileSync(run.metadata.evidencePath, JSON.stringify(evidence.toSnapshot(), null, 2));
-  return run;
 }
 
 describe("skill.test", () => {
-  it("fails when no Runtime Test Fields checks are declared", async () => {
+  it("requires a single expect list", async () => {
     const run = makeRun();
     try {
-      const result = await skillTest("", {
+      expect((await grade(run)).reason).toContain("no Runtime Test Fields checks declared");
+      const legacy = await skillTest("", {
         providerResponse: { metadata: run.metadata },
-        vars: {},
+        vars: { should: [{ "output.contains": { text: "completed" } }] },
       });
-      expect(result.pass).toBe(false);
-      expect(result.reason).toMatch(/no Runtime Test Fields checks declared/);
+      expect(legacy.pass).toBe(false);
     } finally {
       rmSync(run.runDir, { recursive: true, force: true });
     }
   });
 
-  it("fails malformed Runtime Test Fields", async () => {
+  it("checks final output", async () => {
     const run = makeRun();
     try {
-      const result = await skillTest("", {
-        providerResponse: { metadata: run.metadata },
-        vars: { should: [{ "file.contains": "app.js" }] },
-      });
-      expect(result.pass).toBe(false);
-      expect(result.reason).toMatch(/Runtime Test Field|runtime test field/i);
+      expect((await grade(run, [{ "output.contains": { text: "completed" } }])).pass).toBe(true);
+      expect((await grade(run, [{ "output.matches": { pattern: "^task.+safely$" } }])).pass).toBe(true);
     } finally {
       rmSync(run.runDir, { recursive: true, force: true });
     }
   });
 
-  it("rejects double-negative checks under should_not", async () => {
+  it("records verifier results", async () => {
     const run = makeRun();
+    writeFileSync(join(run.worldPath, "verify.sh"), "#!/bin/sh\nexit 0\n");
+    chmodSync(join(run.worldPath, "verify.sh"), 0o755);
     try {
-      const result = await skillTest("", {
-        providerResponse: { metadata: run.metadata },
-        vars: {
-          should_not: [{ "tool.not_called": { tool: "Write" } }],
-        },
-      });
-      expect(result.pass).toBe(false);
-      expect(result.reason).toMatch(/must be declared under should/);
+      expect((await grade(run, [{ "verifier.succeeds": { run: "./verify.sh" } }])).pass).toBe(true);
+      const evidence = JSON.parse(readFileSync(run.metadata.evidencePath, "utf8"));
+      expect(evidence.commands).toMatchObject([{ command: "./verify.sh", exitCode: 0 }]);
     } finally {
       rmSync(run.runDir, { recursive: true, force: true });
     }
   });
 
-  it("records verifier command results into evidence.json", async () => {
-    const run = makeRun();
-    const verifier = join(run.worldPath, "verify.sh");
-    writeFileSync(verifier, "#!/bin/sh\nexit 0\n");
-    chmodSync(verifier, 0o755);
-    try {
-      const result = await skillTest("", {
-        providerResponse: { metadata: run.metadata },
-        vars: {
-          should: [{ "verifier.succeeds": { run: "./verify.sh" } }],
-        },
-      });
-      expect(result.pass).toBe(true);
-      const persisted = JSON.parse(readFileSync(run.metadata.evidencePath, "utf8")) as {
-        commands: Array<{ command: string; exitCode: number }>;
-      };
-      expect(persisted.commands).toMatchObject([{ command: "./verify.sh", exitCode: 0 }]);
-    } finally {
-      rmSync(run.runDir, { recursive: true, force: true });
-    }
-  });
-
-  it("evaluates tool-call checks from Core Evidence", async () => {
-    const run = makeRunWithEvidence((evidence) => {
-      evidence.addToolCall({
-        tool: "Edit",
-        provider: "codex-json",
-        args: { path: "app.js", newString: "/dashboard" },
-        result: "ok",
-        startedAt: 1,
-        durationMs: 2,
-      });
+  it("checks observed tool calls and loaded skills", async () => {
+    const run = makeRun((evidence) => {
+      evidence.addToolCall({ tool: "Edit", provider: "codex-json", startedAt: 1, durationMs: 2 });
+      evidence.addSkillLoad({ skill: "bugfix", delivery: "explicit", provider: "codex-json", source: "$bugfix", startedAt: 1 });
     });
     try {
-      const result = await skillTest("", {
-        providerResponse: { metadata: run.metadata },
-        vars: {
-          should: [
-            {
-              "tool.called": {
-                tool: "Edit",
-                provider: "codex-json",
-                args_match: { path: "app.js" },
-              },
-            },
-            { "tool.not_called": { tool: "Bash" } },
-          ],
-        },
-      });
+      const result = await grade(run, [
+        { "tool.called": { tool: "Edit" } },
+        { "tool.not_called": { tool: "Write" } },
+        { "skill.loaded": { skills: ["bugfix"] } },
+        { "skill.not_loaded": { skills: ["unrelated"] } },
+      ]);
       expect(result.pass).toBe(true);
     } finally {
       rmSync(run.runDir, { recursive: true, force: true });
     }
   });
 
-  it("evaluates loaded-skill checks from MCP resource-read evidence", async () => {
-    const run = makeRunWithEvidence((evidence) => {
-      evidence.addToolCall({
-        tool: "read_resource",
-        provider: "claude-code-json",
-        server: "agent_skill_evals",
-        args: { uri: "skill://brand-deck/SKILL.md" },
-        result: "ok",
-        startedAt: 1,
-        durationMs: 2,
-      });
-    });
+  it("fails closed on incomplete adapter evidence", async () => {
+    const run = makeRun((evidence) => evidence.addWarning("unrecognized event"));
     try {
-      const result = await skillTest("", {
-        providerResponse: { metadata: run.metadata },
-        vars: {
-          should: [
-            {
-              "skill.loaded": {
-                should_include: ["brand-deck"],
-                should_exclude: ["bugfix-workflow"],
-              },
-            },
-          ],
-        },
-      });
-      expect(result.pass).toBe(true);
-    } finally {
-      rmSync(run.runDir, { recursive: true, force: true });
-    }
-  });
-
-  it("evaluates loaded-skill checks from Core Evidence", async () => {
-    const run = makeRunWithEvidence((evidence) => {
-      evidence.addSkillLoad({
-        skill: "brand-deck",
-        delivery: "mcp",
-        provider: "claude-code-json",
-        server: "agent-skill-evals",
-        source: "load_brand_deck_skill",
-        startedAt: 1,
-      });
-    });
-    try {
-      const result = await skillTest("", {
-        providerResponse: { metadata: run.metadata },
-        vars: {
-          should: [
-            {
-              "skill.loaded": {
-                delivery: "mcp",
-                server: "agent-skill-evals",
-                should_include: ["brand-deck"],
-                should_exclude: ["bugfix-workflow"],
-              },
-            },
-          ],
-        },
-      });
-      expect(result.pass).toBe(true);
-    } finally {
-      rmSync(run.runDir, { recursive: true, force: true });
-    }
-  });
-
-  it("honors should_not polarity for loaded-skill checks", async () => {
-    const run = makeRunWithEvidence((evidence) => {
-      evidence.addSkillLoad({
-        skill: "brand-deck",
-        delivery: "mcp",
-        provider: "claude-code-json",
-        startedAt: 1,
-      });
-    });
-    try {
-      const result = await skillTest("", {
-        providerResponse: { metadata: run.metadata },
-        vars: {
-          should_not: [
-            {
-              "skill.loaded": {
-                should_include: ["bugfix-workflow"],
-              },
-            },
-          ],
-        },
-      });
-      expect(result.pass).toBe(true);
-    } finally {
-      rmSync(run.runDir, { recursive: true, force: true });
-    }
-  });
-
-  it.each([
-    ["file.exists", {}],
-    ["file.exists", { path: "" }],
-    ["file.created", {}],
-    ["file.created", { path: "" }],
-    ["file.not_modified", {}],
-    ["file.not_modified", { path: "" }],
-  ])("fails %s when path is missing or empty", async (type, args) => {
-    const run = makeRun();
-    try {
-      const result = await skillTest("", {
-        providerResponse: { metadata: run.metadata },
-        vars: { should: [{ [type]: args }] },
-      });
+      const result = await grade(run, [{ "output.contains": { text: "completed" } }]);
       expect(result.pass).toBe(false);
-      expect(result.reason).toContain(`${type}: assertion.path must be a non-empty string`);
-    } finally {
-      rmSync(run.runDir, { recursive: true, force: true });
-    }
-  });
-
-  it("passes file.not_modified when the file is absent and no write evidence exists", async () => {
-    const run = makeRun();
-    try {
-      const result = await skillTest("", {
-        providerResponse: { metadata: run.metadata },
-        vars: { should: [{ "file.not_modified": { path: "missing.txt" } }] },
-      });
-      expect(result.pass).toBe(true);
-    } finally {
-      rmSync(run.runDir, { recursive: true, force: true });
-    }
-  });
-
-  it("fails file.not_modified when write evidence exists for an absent file path", async () => {
-    const run = makeRunWithEvidence((evidence) => {
-      evidence.addFileWrite({ path: "missing.txt", op: "modify" });
-    });
-    try {
-      const result = await skillTest("", {
-        providerResponse: { metadata: run.metadata },
-        vars: { should: [{ "file.not_modified": { path: "missing.txt" } }] },
-      });
-      expect(result.pass).toBe(false);
-      expect(result.reason).toContain("file.not_modified: missing.txt was modified");
-    } finally {
-      rmSync(run.runDir, { recursive: true, force: true });
-    }
-  });
-
-  it.each([
-    [{}],
-    [{ scope: [] }],
-    [{ scope: [""] }],
-    [{ scope: ["src/", ""] }],
-  ])("fails file.changes_outside_scope when scope is missing or empty", async (args) => {
-    const run = makeRun();
-    try {
-      const result = await skillTest("", {
-        providerResponse: { metadata: run.metadata },
-        vars: { should: [{ "file.changes_outside_scope": args }] },
-      });
-      expect(result.pass).toBe(false);
-      expect(result.reason).toContain(
-        "file.changes_outside_scope: assertion.scope must contain at least one non-empty string",
-      );
-    } finally {
-      rmSync(run.runDir, { recursive: true, force: true });
-    }
-  });
-
-  it("passes unfiltered tool.not_called when no tool calls were recorded", async () => {
-    const run = makeRun();
-    try {
-      const result = await skillTest("", {
-        providerResponse: { metadata: run.metadata },
-        vars: { should: ["tool.not_called"] },
-      });
-      expect(result.pass).toBe(true);
-    } finally {
-      rmSync(run.runDir, { recursive: true, force: true });
-    }
-  });
-
-  it("fails unfiltered tool.not_called when any tool call was recorded", async () => {
-    const run = makeRunWithEvidence((evidence) => {
-      evidence.addToolCall({
-        tool: "Edit",
-        provider: "codex-json",
-        args: { path: "app.js" },
-        result: "ok",
-        startedAt: 1,
-        durationMs: 2,
-      });
-    });
-    try {
-      const result = await skillTest("", {
-        providerResponse: { metadata: run.metadata },
-        vars: { should: ["tool.not_called"] },
-      });
-      expect(result.pass).toBe(false);
-      expect(result.reason).toContain("forbidden built-in tool call observed");
-    } finally {
-      rmSync(run.runDir, { recursive: true, force: true });
-    }
-  });
-
-  it("accepts args_match as the only tool.not_called selector", async () => {
-    const run = makeRunWithEvidence((evidence) => {
-      evidence.addToolCall({
-        tool: "Edit",
-        provider: "codex-json",
-        args: { path: "app.js" },
-        result: "ok",
-        startedAt: 1,
-        durationMs: 2,
-      });
-    });
-    try {
-      const result = await skillTest("", {
-        providerResponse: { metadata: run.metadata },
-        vars: { should: [{ "tool.not_called": { args_match: { path: "missing.js" } } }] },
-      });
-      expect(result.pass).toBe(true);
+      expect(result.reason).toContain("evidence warning");
+      expect(result.reason).toContain("Evidence:");
     } finally {
       rmSync(run.runDir, { recursive: true, force: true });
     }

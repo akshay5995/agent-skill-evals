@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "agent_skill_evals": {
-      "type": "http",
-      "url": "${AGENT_SKILL_EVALS_MCP_URL}"
-    }
-  }
-}

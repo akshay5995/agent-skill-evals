@@ -2,29 +2,19 @@ import { describe, expect, it } from "vitest";
 import { parseAssertionEntries, parseRuntimeTestFields } from "../assertion-entries.js";
 
 describe("parseAssertionEntries", () => {
-  it("parses string entries", () => {
-    expect(parseAssertionEntries(["file.exists"], "should").entries).toEqual([
-      { type: "file.exists", args: {} },
-    ]);
-  });
-
-  it("parses typed object entries", () => {
-    const entry = { type: "file.exists", path: "app.js" };
-    expect(parseAssertionEntries([entry], "should").entries).toEqual([
-      { type: "file.exists", args: entry },
-    ]);
+  it("rejects legacy string and typed-object entries", () => {
+    const result = parseAssertionEntries([
+      "file.exists",
+      { type: "file.exists", path: "app.js" },
+    ], "should");
+    expect(result.entries).toEqual([]);
+    expect(result.errors).toHaveLength(2);
   });
 
   it("parses single-key object entries", () => {
     expect(parseAssertionEntries([{ "file.contains": { path: "app.js", text: "ok" } }], "should").entries).toEqual([
       { type: "file.contains", args: { path: "app.js", text: "ok" } },
     ]);
-  });
-
-  it("reports malformed entries", () => {
-    const result = parseAssertionEntries([null, 1, [], { a: {}, b: {} }, { type: 1 }], "should");
-    expect(result.entries).toEqual([]);
-    expect(result.errors).toHaveLength(5);
   });
 
   it("returns entries and diagnostics for malformed authoring", () => {
@@ -42,7 +32,7 @@ describe("parseAssertionEntries", () => {
     ]);
     expect(r.errors.map((e) => e.reason)).toEqual([
       'shorthand assertion "file.contains" value must be an object',
-      "`type` must be a non-empty string",
+      'shorthand assertion "type" value must be an object',
       "shorthand assertion object must have exactly one key",
     ]);
   });
@@ -60,11 +50,13 @@ describe("parseAssertionEntries", () => {
     });
   });
 
-  it("rejects double-negative checks under should_not", () => {
+  it("parses the single public expect list", () => {
     const result = parseRuntimeTestFields({
-      should_not: [{ "code.no_pattern": { glob: "**/*.ts", pattern: "TODO" } }],
+      expect: [{ "tool.not_called": { tool: "Bash" } }],
     });
-    expect(result.should_not).toEqual([]);
-    expect(result.errors[0]?.reason).toMatch(/must be declared under should/);
+    expect(result.expect).toEqual([
+      { type: "tool.not_called", args: { tool: "Bash" } },
+    ]);
+    expect(result.errors).toEqual([]);
   });
 });

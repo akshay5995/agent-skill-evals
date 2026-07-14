@@ -1,57 +1,55 @@
-import * as Either from "effect/Either";
-import * as ParseResult from "effect/ParseResult";
-import * as Schema from "effect/Schema";
-import {
-  EVIDENCE_SCHEMA_VERSION,
-  type CommandEvent,
-  type EvidenceSnapshot,
-  type FileEvent,
-  type SkillLoadEvent,
-  type RunSummary,
-  type ToolCallEvent,
-  type Usage,
-} from "./evidence-types.js";
+import { z } from "zod";
 
-const OptionalString = Schema.optional(Schema.String);
-const OptionalNumber = Schema.optional(Schema.Number);
-const StringArray = Schema.mutable(Schema.Array(Schema.String));
+export const EVIDENCE_SCHEMA_VERSION = "agent-skill-evals.evidence.v2";
 
-const CommandEventSchema = Schema.Struct({
-  command: Schema.String,
-  args: Schema.optionalWith(StringArray, { default: () => [] }),
-  exitCode: Schema.Number,
+const OptionalString = z.string().optional();
+const OptionalNumber = z.number().optional();
+const StringArray = z.array(z.string());
+
+const CommandEventSchema = z.object({
+  command: z.string(),
+  args: z.array(z.string()).default([]),
+  exitCode: z.number(),
   signal: OptionalString,
   stdout: OptionalString,
   stderr: OptionalString,
-  startedAt: Schema.Number,
-  durationMs: Schema.Number,
+  startedAt: z.number(),
+  durationMs: z.number(),
+  turn: OptionalNumber,
 });
 
-const FileEventSchema = Schema.Struct({
-  path: Schema.String,
-  op: Schema.Literal("create", "modify", "delete"),
+const FileEventSchema = z.object({
+  path: z.string(),
+  op: z.enum(["create", "modify", "delete"]),
 });
 
-const ToolCallEventSchema = Schema.Struct({
-  tool: Schema.String,
+const ToolCallEventSchema = z.object({
+  tool: z.string(),
   provider: OptionalString,
   server: OptionalString,
-  args: Schema.optional(Schema.Unknown),
-  result: Schema.optional(Schema.Unknown),
-  startedAt: Schema.Number,
-  durationMs: Schema.Number,
+  args: z.unknown().optional(),
+  result: z.unknown().optional(),
+  startedAt: z.number(),
+  durationMs: z.number(),
+  turn: OptionalNumber,
 });
 
-const SkillLoadEventSchema = Schema.Struct({
-  skill: Schema.String,
-  delivery: Schema.Literal("native", "mcp"),
+const SkillLoadEventSchema = z.object({
+  skill: z.string(),
+  delivery: z.enum(["native", "mcp", "explicit"]),
   provider: OptionalString,
   server: OptionalString,
   source: OptionalString,
-  startedAt: Schema.Number,
+  startedAt: z.number(),
 });
 
-const UsageSchema = Schema.Struct({
+const SkillAvailableEventSchema = z.object({
+  skill: z.string(),
+  path: z.string(),
+  role: z.enum(["under-test", "supporting", "distractor"]),
+});
+
+const UsageSchema = z.object({
   inputTokens: OptionalNumber,
   outputTokens: OptionalNumber,
   totalTokens: OptionalNumber,
@@ -59,54 +57,80 @@ const UsageSchema = Schema.Struct({
   cacheWriteTokens: OptionalNumber,
 });
 
-const RunSummarySchema = Schema.Struct({
-  runDir: Schema.String,
-  worldPath: Schema.String,
-  fixture: Schema.String,
+const RunSummarySchema = z.object({
+  runDir: z.string(),
+  worldPath: z.string(),
+  fixture: z.string().optional(),
   durationMs: OptionalNumber,
 });
 
-const EvidenceSnapshotSchema = Schema.Struct({
-  schemaVersion: Schema.Literal(EVIDENCE_SCHEMA_VERSION),
-  output: Schema.optionalWith(Schema.String, { default: () => "" }),
+const RuntimeIdentitySchema = z.object({
+  adapter: OptionalString,
+  preset: OptionalString,
+  command: OptionalString,
+  cliVersion: OptionalString,
+  model: OptionalString,
+  continuation: z.enum(["transcript-replay", "native-session"]).optional(),
+});
+
+const TurnRecordSchema = z.object({
+  turn: z.number(),
+  role: z.enum(["user", "agent"]),
+  text: z.string(),
+  startedAt: z.number(),
+  durationMs: z.number(),
+  usage: UsageSchema.optional(),
+});
+
+const EvidenceSnapshotSchema = z.object({
+  schemaVersion: z.literal(EVIDENCE_SCHEMA_VERSION),
+  output: z.string().default(""),
   run: RunSummarySchema,
-  commands: Schema.optionalWith(Schema.mutable(Schema.Array(CommandEventSchema)), { default: () => [] }),
-  filesWritten: Schema.optionalWith(Schema.mutable(Schema.Array(FileEventSchema)), { default: () => [] }),
-  toolCalls: Schema.optionalWith(Schema.mutable(Schema.Array(ToolCallEventSchema)), { default: () => [] }),
-  skillsLoaded: Schema.optionalWith(Schema.mutable(Schema.Array(SkillLoadEventSchema)), { default: () => [] }),
-  usage: Schema.optionalWith(UsageSchema, { default: () => ({}) }),
-  extensions: Schema.optional(Schema.Record({
-    key: Schema.String,
-    value: Schema.Unknown,
-  })),
+  commands: z.array(CommandEventSchema).default([]),
+  filesWritten: z.array(FileEventSchema).default([]),
+  toolCalls: z.array(ToolCallEventSchema).default([]),
+  skillsLoaded: z.array(SkillLoadEventSchema).default([]),
+  skillsAvailable: z.array(SkillAvailableEventSchema).default([]),
+  usage: UsageSchema.default({}),
+  turns: z.array(TurnRecordSchema).optional(),
+  runtime: RuntimeIdentitySchema.optional(),
+  warnings: StringArray.optional(),
+  extensions: z.record(z.string(), z.unknown()).optional(),
 });
 
-const decodeEvidenceSnapshot = Schema.decodeUnknownEither(EvidenceSnapshotSchema, {
-  errors: "all",
-});
+export type CommandEvent = z.infer<typeof CommandEventSchema>;
+export type FileEvent = z.infer<typeof FileEventSchema>;
+export type ToolCallEvent = z.infer<typeof ToolCallEventSchema>;
+export type SkillLoadEvent = z.infer<typeof SkillLoadEventSchema>;
+export type SkillAvailableEvent = z.infer<typeof SkillAvailableEventSchema>;
+export type Usage = z.infer<typeof UsageSchema>;
+export type RunSummary = z.infer<typeof RunSummarySchema>;
+export type RuntimeIdentity = z.infer<typeof RuntimeIdentitySchema>;
+export type TurnRecord = z.infer<typeof TurnRecordSchema>;
+export type EvidenceSnapshot = z.infer<typeof EvidenceSnapshotSchema>;
 
-export type {
-  CommandEvent,
-  EvidenceSnapshot,
-  FileEvent,
-  SkillLoadEvent,
-  RunSummary,
-  ToolCallEvent,
-  Usage,
-};
+export type DecodeResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: Error };
 
-export { EVIDENCE_SCHEMA_VERSION };
-
-export function decodeEvidenceSnapshotEither(
-  input: unknown,
-): Either.Either<EvidenceSnapshot, Error> {
-  const decoded = decodeEvidenceSnapshot(input);
-  if (Either.isRight(decoded)) return Either.right(decoded.right);
-  return Either.left(new Error(ParseResult.TreeFormatter.formatErrorSync(decoded.left)));
+export function decodeEvidenceSnapshot(input: unknown): DecodeResult<EvidenceSnapshot> {
+  const decoded = EvidenceSnapshotSchema.safeParse(input);
+  if (decoded.success) {
+    return { ok: true, value: decoded.data };
+  }
+  return {
+    ok: false,
+    error: new Error(
+      "the evidence file does not match the agent-skill-evals.evidence.v2 shape. " +
+        "It was probably written by a different agent-skill-evals version or edited by hand — " +
+        "re-run the eval to regenerate it. " +
+        `Details: ${z.prettifyError(decoded.error)}`,
+    ),
+  };
 }
 
 export function parseEvidenceSnapshot(input: unknown): EvidenceSnapshot {
-  const decoded = decodeEvidenceSnapshotEither(input);
-  if (Either.isRight(decoded)) return decoded.right;
-  throw decoded.left;
+  const decoded = decodeEvidenceSnapshot(input);
+  if (decoded.ok) return decoded.value;
+  throw decoded.error;
 }

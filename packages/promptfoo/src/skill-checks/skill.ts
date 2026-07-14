@@ -1,11 +1,6 @@
 import { join, dirname, isAbsolute, resolve as resolvePath } from "node:path";
-import * as Effect from "effect/Effect";
-import {
-  FileSystem,
-  NodeServicesLive,
-  pathExists,
-  YamlParser,
-} from "../internal-services.js";
+import { readFile } from "node:fs/promises";
+import { parseYaml, pathExists } from "../internal-services.js";
 
 export interface SkillFrontmatter {
   name?: string;
@@ -32,24 +27,15 @@ export interface ParsedSkill {
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
 export async function parseSkillMd(skillMdPath: string): Promise<ParsedSkill> {
-  return Effect.runPromise(parseSkillMdEffect(skillMdPath).pipe(Effect.provide(NodeServicesLive)));
-}
-
-export function parseSkillMdEffect(
-  skillMdPath: string,
-): Effect.Effect<ParsedSkill, unknown, FileSystem | YamlParser> {
-  return Effect.gen(function* () {
   const skillDir = dirname(skillMdPath);
-  const fs = yield* FileSystem;
-  const yaml = yield* YamlParser;
-  const raw = yield* fs.readText(skillMdPath);
+  const raw = await readFile(skillMdPath, "utf8");
   const totalLines = raw.split(/\r?\n/).length;
 
   let frontmatter: SkillFrontmatter = {};
   let body = raw;
   const fmMatch = raw.match(FRONTMATTER_RE);
   if (fmMatch) {
-    const parsed = yield* yaml.parse(fmMatch[1]!);
+    const parsed = parseYaml(fmMatch[1]!);
     if (parsed && typeof parsed === "object") {
       frontmatter = parsed as SkillFrontmatter;
     }
@@ -60,7 +46,7 @@ export function parseSkillMdEffect(
   const missingReferences: string[] = [];
   for (const ref of references) {
     const abs = isAbsolute(ref) ? ref : resolvePath(skillDir, ref);
-    if (!(yield* pathExists(abs))) missingReferences.push(ref);
+    if (!(await pathExists(abs))) missingReferences.push(ref);
   }
 
   return {
@@ -72,7 +58,6 @@ export function parseSkillMdEffect(
     references,
     missingReferences,
   };
-  });
 }
 
 /**
@@ -96,13 +81,12 @@ function extractReferences(body: string): string[] {
   while ((m = codeRe.exec(body)) !== null) {
     const target = m[1]!;
     if (target.includes("://")) continue;
+    // Require a path separator: a bare dotted identifier in inline code
+    // (a metric name like `skill.test`, a version, etc.) is not a file ref.
+    if (!target.includes("/")) continue;
     refs.add(target);
   }
   return [...refs];
-}
-
-export async function fileExists(p: string): Promise<boolean> {
-  return Effect.runPromise(pathExists(p).pipe(Effect.provide(NodeServicesLive)));
 }
 
 export function joinSkill(skillDir: string, rel: string): string {

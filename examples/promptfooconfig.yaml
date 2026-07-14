@@ -1,0 +1,23 @@
+description: Agent Skill Evals cross-adapter example
+
+prompts: ["{{prompt}}"]
+
+providers:
+  - id: file://./agent-skill-evals/agent.js
+    label: codex-real-agent
+    config: { preset: codex, timeoutMs: 300000 }
+  - id: file://./agent-skill-evals/agent.js
+    label: claude-real-agent
+    config: { preset: claude-code, timeoutMs: 300000 }
+  - id: file://./agent-skill-evals/agent.js
+    label: pi-real-agent
+    config: { preset: pi, timeoutMs: 300000 }
+
+defaultTest:
+  options: { runSerially: true }
+
+tests:
+  path: file://./agent-skill-evals/test-generator.js
+  config:
+    path: ./tests/bugfix-workflow.yaml
+    assertionPath: file://./agent-skill-evals/assertions.js

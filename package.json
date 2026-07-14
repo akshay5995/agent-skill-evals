@@ -17,8 +17,11 @@
   "pnpm": {
     "overrides": {
       "axios": "1.16.1",
-      "vite@<=6.4.1": "6.4.2",
-      "protobufjs@>=8.0.0 <=8.0.1": "8.3.0"
+      "form-data@>=4.0.0 <4.0.6": "4.0.6",
+      "protobufjs@<=7.6.0": "7.6.1",
+      "vite@<=6.4.2": "6.4.3",
+      "protobufjs@>=8.0.0 <=8.4.0": "8.4.1",
+      "ws@>=8.0.0 <8.21.0": "8.21.0"
     }
   },
   "scripts": {
@@ -26,16 +29,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "pnpm -r --if-present build",
-    "eval": "pnpm --filter @agent-skill-evals/examples eval",
-    "eval:static": "pnpm --filter @agent-skill-evals/examples eval:static",
+    "schema:generate": "pnpm --dir packages/promptfoo run schema:generate",
+    "eval:static": "pnpm --dir packages/promptfoo exec tsx src/cli/init.ts check ../../examples/skills/bugfix-workflow --tests ../../examples/tests/bugfix-workflow.yaml",
     "eval:codex": "pnpm --filter @agent-skill-evals/examples eval:codex",
     "eval:claude": "pnpm --filter @agent-skill-evals/examples eval:claude",
     "eval:pi": "pnpm --filter @agent-skill-evals/examples eval:pi",
-    "eval:mcp": "pnpm --filter @agent-skill-evals/examples eval:mcp",
-    "eval:mcp:claude": "pnpm --filter @agent-skill-evals/examples eval:mcp:claude",
-    "eval:mcp:codex": "pnpm --filter @agent-skill-evals/examples eval:mcp:codex",
-    "eval:native:pi": "pnpm --filter @agent-skill-evals/examples eval:native:pi",
-    "eval:routing": "pnpm --filter @agent-skill-evals/examples eval:routing",
+    "eval:multiturn": "pnpm --filter @agent-skill-evals/examples eval:multiturn",
     "eval:real": "pnpm --filter @agent-skill-evals/examples eval:real",
     "docs:dev": "pnpm --filter @agent-skill-evals/docs docs:dev",
     "docs:build": "pnpm --filter @agent-skill-evals/docs docs:build",
@@ -44,10 +43,11 @@
   },
   "devDependencies": {
     "@types/node": "^22.7.5",
+    "ajv": "^8.20.0",
     "tsdown": "^0.21.10",
     "typescript": "^5.6.2",
     "vitepress": "^1.6.3",
-    "vitest": "^2.1.2",
+    "vitest": "^3.2.6",
     "vue": "^3.5.13"
   }
 }

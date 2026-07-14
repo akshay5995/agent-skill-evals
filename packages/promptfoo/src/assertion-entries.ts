@@ -1,8 +1,3 @@
-import * as Either from "effect/Either";
-import * as Schema from "effect/Schema";
-import { doubleNegativeCheckTypeSet } from "./runtime-checks/check-set.js";
-import type { AssertionMode } from "./internal-types.js";
-
 export interface AssertionEntry {
   type: string;
   args: unknown;
@@ -21,63 +16,40 @@ export interface ParsedAssertionEntries {
 
 export interface RuntimeTestFieldEntries {
   preconditions: AssertionEntry[];
-  should: AssertionEntry[];
-  should_not: AssertionEntry[];
+  expect: AssertionEntry[];
   errors: AssertionEntryError[];
 }
 
-interface TypedEntry {
-  type?: unknown;
-  [key: string]: unknown;
+function isEntryObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-const RuntimeFieldArraySchema = Schema.Array(Schema.Unknown);
-const EntryObjectSchema = Schema.Unknown.pipe(
-  Schema.filter(
-    (value): value is Record<string, unknown> =>
-      typeof value === "object" && value !== null && !Array.isArray(value),
-    { identifier: "AssertionEntryObject" },
-  ),
-);
-const NonEmptyTypeSchema = Schema.String.pipe(
-  Schema.filter((value) => value.length > 0, { identifier: "NonEmptyType" }),
-);
-
 /**
- * Normalizes Promptfoo `vars.preconditions | should | should_not` entries.
+ * Normalizes generated Promptfoo `vars.preconditions | expect` entries.
  *
- * Supported forms:
- * - `"file.exists"`
- * - `{ type: "file.exists", path: "app.js" }`
- * - `{ "file.exists": { path: "app.js" } }`
+ * Supports the clean Test Pack shorthand form:
+ * `{ "file.exists": { path: "app.js" } }`
  */
 export function parseRuntimeTestFields(
   vars: Record<string, unknown>,
 ): RuntimeTestFieldEntries {
   const preconditions = parseAssertionEntries(vars.preconditions, "preconditions", {
     allowMissing: true,
-    mode: "precondition",
   });
-  const should = parseAssertionEntries(vars.should, "should", {
+  const expect = parseAssertionEntries(vars.expect, "expect", {
     allowMissing: true,
-    mode: "should",
-  });
-  const shouldNot = parseAssertionEntries(vars.should_not, "should_not", {
-    allowMissing: true,
-    mode: "should_not",
   });
   return {
     preconditions: preconditions.entries,
-    should: should.entries,
-    should_not: shouldNot.entries,
-    errors: [...preconditions.errors, ...should.errors, ...shouldNot.errors],
+    expect: expect.entries,
+    errors: [...preconditions.errors, ...expect.errors],
   };
 }
 
 export function parseAssertionEntries(
   raw: unknown,
   field: string,
-  options: { allowMissing?: boolean; mode?: AssertionMode } = {},
+  options: { allowMissing?: boolean } = {},
 ): ParsedAssertionEntries {
   const entries: AssertionEntry[] = [];
   const errors: AssertionEntryError[] = [];
@@ -89,30 +61,18 @@ export function parseAssertionEntries(
     return { entries, errors };
   }
 
-  const rawEntries = Schema.decodeUnknownEither(RuntimeFieldArraySchema)(raw);
-  if (Either.isLeft(rawEntries)) {
+  if (!Array.isArray(raw)) {
     return {
       entries,
       errors: [{ field, reason: "must be an array of assertion entries" }],
     };
   }
 
-  rawEntries.right.forEach((entry, index) => {
+  raw.forEach((entry, index) => {
     const parsed = parseAssertionEntry(entry, field, index);
     if ("error" in parsed) {
       errors.push(parsed.error);
     } else {
-      if (
-        options.mode === "should_not" &&
-        doubleNegativeCheckTypeSet.has(parsed.entry.type)
-      ) {
-        errors.push({
-          field,
-          index,
-          reason: `"${parsed.entry.type}" must be declared under should, not should_not`,
-        });
-        return;
-      }
       entries.push(parsed.entry);
     }
   });
@@ -125,36 +85,17 @@ function parseAssertionEntry(
   field: string,
   index: number,
 ): { entry: AssertionEntry } | { error: AssertionEntryError } {
-  if (typeof entry === "string") {
-    if (Either.isLeft(Schema.decodeUnknownEither(NonEmptyTypeSchema)(entry))) {
-      return { error: { field, index, reason: "string entry must not be empty" } };
-    }
-    return { entry: { type: entry, args: {} } };
-  }
-
-  const decodedObject = Schema.decodeUnknownEither(EntryObjectSchema)(entry);
-  if (Either.isLeft(decodedObject)) {
+  if (!isEntryObject(entry)) {
     return {
       error: {
         field,
         index,
-        reason: "entry must be a string, { type: ... }, or shorthand object",
+        reason: "entry must be a shorthand assertion object",
       },
     };
   }
 
-  const candidate = decodedObject.right as TypedEntry;
-  if ("type" in candidate) {
-    const type = Schema.decodeUnknownEither(NonEmptyTypeSchema)(candidate.type);
-    if (Either.isLeft(type)) {
-      return {
-        error: { field, index, reason: "`type` must be a non-empty string" },
-      };
-    }
-    return { entry: { type: type.right, args: candidate } };
-  }
-
-  const keys = Object.keys(candidate);
+  const keys = Object.keys(entry);
   if (keys.length !== 1) {
     return {
       error: {
@@ -166,8 +107,8 @@ function parseAssertionEntry(
   }
 
   const type = keys[0]!;
-  const args = candidate[type] ?? {};
-  if (args !== null && typeof args !== "object") {
+  const args = entry[type];
+  if (!isEntryObject(args)) {
     return {
       error: {
         field,

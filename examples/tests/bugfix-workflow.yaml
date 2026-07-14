@@ -1,62 +1,43 @@
-- description: bugfix-workflow positive (fix login redirect)
-  vars:
-    skill: bugfix-workflow
-    kind: positive
-    fixture: ./fixtures/login-bug
-    prompt: "Fix the login redirect bug — it should send users to /dashboard."
-    preconditions:
-      - verifier.fails:
-          run: ./verify_login_redirect.sh
-    should:
-      - verifier.succeeds:
-          run: ./verify_login_redirect.sh
-      - file.contains:
-          path: app.js
-          text: /dashboard
-      - tool.called:
-          tool: Edit
-          args_match:
-            path: app.js
-      # Tool checks only inspect normalized adapter evidence. Use verifier or
-      # file checks for final behavior guarantees.
-      - tool.not_called:
-          tool: Bash
-    should_not:
-      - file.changes_outside_scope:
-          scope:
-            - app.js
-  assert:
-    - type: javascript
-      metric: skill.test
-      value: file://./agent-skill-evals/assertions.js
-      config:
-        metric: skill.test
+# yaml-language-server: $schema=../../packages/promptfoo/schema/test-pack.schema.json
+skill: ../skills/bugfix-workflow
 
-- description: bugfix-workflow scoped local fix
-  vars:
-    skill: bugfix-workflow
-    kind: negative
-    fixture: ./fixtures/login-bug
-    prompt: "Fix the login redirect bug locally only. Keep the change scoped to app.js."
+tests:
+  - description: fixes the login redirect in a fresh project
+    prompt: Fix the login redirect so successful logins go to /dashboard.
+    fixture: ../fixtures/login-bug
     preconditions:
-      - verifier.fails:
-          run: ./verify_login_redirect.sh
-    should:
-      - verifier.succeeds:
-          run: ./verify_login_redirect.sh
-      - tool.called:
-          tool: Edit
-          args_match:
-            path: app.js
-      - tool.not_called:
-          tool: Bash
-    should_not:
-      - file.changes_outside_scope:
-          scope:
-            - app.js
-  assert:
-    - type: javascript
-      metric: skill.test
-      value: file://./agent-skill-evals/assertions.js
-      config:
-        metric: skill.test
+      - verifier.fails: { run: ./verify_login_redirect.sh }
+    expect:
+      - verifier.succeeds: { run: ./verify_login_redirect.sh }
+      - file.contains: { path: app.js, text: /dashboard }
+      - file.changes_within: { paths: [app.js] }
+    budget: { max_total_tokens: 300000 }
+
+  - description: keeps following the workflow after a requirement changes
+    prompt: Fix the login redirect so successful logins go to /dashboard.
+    fixture: ../fixtures/login-bug
+    conversation:
+      max_turns: 2
+      scripted_user:
+        - Keep the change scoped to app.js and confirm the verifier passes.
+    expect:
+      - verifier.succeeds: { run: ./verify_login_redirect.sh }
+      - turn.count: { min: 2, max: 2 }
+      - file.changes_within: { paths: [app.js] }
+    budget: { max_total_tokens: 300000 }
+
+  - description: uses the issue-status command boundary before fixing
+    prompt: Check issue-status LOGIN-123, then fix the reported login redirect so successful logins go to /dashboard.
+    fixture: ../fixtures/login-bug
+    environment:
+      mocks:
+        - name: issue-status
+          kind: command
+          executable: ../mocks/issue-status
+    preconditions:
+      - verifier.fails: { run: ./verify_login_redirect.sh }
+    expect:
+      - verifier.succeeds: { run: ./verify_login_redirect.sh }
+      - file.contains: { path: issue-status.log, text: LOGIN-123 confirmed }
+      - file.changes_within: { paths: [app.js, issue-status.log] }
+    budget: { max_total_tokens: 300000 }

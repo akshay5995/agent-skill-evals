@@ -21,37 +21,15 @@ export default defineConfig({
     },
     nav: [
       { text: "Start", link: "/guide/getting-started" },
-      { text: "Examples", link: "/examples/brand-deck-skill" },
-      { text: "Reference", link: "/guide/runtime-checks" },
+      { text: "Reference", link: "/guide/reference" },
     ],
     sidebar: [
       {
-        text: "Start",
+        text: "Docs",
         items: [
           { text: "Overview", link: "/" },
           { text: "Getting Started", link: "/guide/getting-started" },
-          { text: "Core Concepts", link: "/guide/core-concepts" },
-          { text: "Promptfoo Setup", link: "/guide/promptfoo-setup" },
-        ],
-      },
-      {
-        text: "Reference",
-        items: [
-          { text: "Runtime Checks", link: "/guide/runtime-checks" },
-          { text: "Skill Loading", link: "/guide/routing-evals" },
-          { text: "Metrics", link: "/guide/metrics" },
-          { text: "Package Reference", link: "/guide/package-map" },
-        ],
-      },
-      {
-        text: "Examples",
-        items: [
-          { text: "Brand Deck Skill", link: "/examples/brand-deck-skill" },
-          { text: "Bugfix Skill", link: "/examples/bugfix-skill" },
-          { text: "Set Up Tests", link: "/examples/meta-skill" },
-          { text: "Skill Checks", link: "/examples/static-checks" },
-          { text: "File and Code Checks", link: "/examples/file-code-checks" },
-          { text: "Tool Checks", link: "/examples/tool-checks" },
+          { text: "Reference", link: "/guide/reference" },
         ],
       },
     ],

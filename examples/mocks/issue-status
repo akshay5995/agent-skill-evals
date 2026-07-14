@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+printf 'LOGIN-123 confirmed\n'
+printf 'LOGIN-123 confirmed\n' > issue-status.log

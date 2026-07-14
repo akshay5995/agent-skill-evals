@@ -1,0 +1,15 @@
+# Copy into .github/workflows/ in a project using Agent Skill Evals.
+name: skill-checks
+on: [pull_request]
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec agent-skill-evals check ./skills/my-skill --strict
