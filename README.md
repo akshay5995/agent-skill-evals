@@ -4,9 +4,13 @@
 
 # Agent Skill Evals
 
-Test reusable agent skills with real agents and observable evidence.
+[![skills.sh](https://skills.sh/b/akshay5995/agent-skill-evals)](https://skills.sh/akshay5995/agent-skill-evals)
 
-Agent Skill Evals gives [Promptfoo](https://www.promptfoo.dev/) the skill-aware setup, static checks, isolated test environments, and runtime assertions needed to answer two different questions:
+Test whether reusable instructions for AI agents actually work.
+
+An agent skill is a reusable playbook that tells an AI agent how to perform a task. Agent Skill Evals lets you give that skill realistic jobs, run them with real agents, and verify what actually happened. Unlike general model or application evals, the skill itself is the product under test.
+
+Agent Skill Evals gives [Promptfoo](https://www.promptfoo.dev/) the skill-aware setup, static checks, isolated test environments, and runtime assertions needed to answer two questions:
 
 1. Is the skill clear and testable before an agent runs?
 2. Did the agent load the right skill and produce the expected result?
@@ -96,6 +100,16 @@ There is no second eval runner and no private-intent inference. Routing tests mu
 - [Reference](./docs/guide/reference.md) covers Test Packs, Worlds, role play, mocks, runtime checks, evidence, and budgets.
 - [Runnable examples](./examples) exercise the same Test Pack across Codex, Claude Code, and Pi.
 - [Promptfoo documentation](https://www.promptfoo.dev/docs/intro/) covers Promptfoo configuration, filtering, caching, output, and its web UI.
+
+## Install Agent Skill Evals
+
+To let your agent set up an evaluation for an existing skill, install the bundled `agent-eval-skills` skill from [skills.sh](https://skills.sh/akshay5995/agent-skill-evals):
+
+```sh
+npx skills add akshay5995/agent-skill-evals
+```
+
+This installs the authoring workflow for creating an eval. The `agent-skill-evals` and `promptfoo` packages still provide the static checks and runtime evaluation.
 
 ## Development
 
