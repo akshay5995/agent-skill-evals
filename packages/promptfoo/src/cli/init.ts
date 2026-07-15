@@ -25,10 +25,10 @@ export interface CliIo {
 }
 
 const SHIMS: Record<string, string> = {
-  "agent-skill-evals/agent.js": 'export { default } from "agent-skill-evals/agent";\n',
+  "agent-skill-evals/agent.mjs": 'export { default } from "agent-skill-evals/agent";\n',
   "agent-skill-evals/assertions.js":
     'import("agent-skill-evals/assertions").then(({ default: grade }) => grade(output, context))\n',
-  "agent-skill-evals/test-generator.js":
+  "agent-skill-evals/test-generator.mjs":
     'export { default } from "agent-skill-evals/test-generator";\n',
 };
 
@@ -39,7 +39,7 @@ prompts:
   - "{{prompt}}"
 
 providers:
-  - id: file://./agent-skill-evals/agent.js
+  - id: file://./agent-skill-evals/agent.mjs
     label: ${adapter}-agent
     config:
       preset: ${adapter}
@@ -50,7 +50,7 @@ defaultTest:
     runSerially: true
 
 tests:
-  path: file://./agent-skill-evals/test-generator.js
+  path: file://./agent-skill-evals/test-generator.mjs
   config:
     path: ./${testsPath}
     assertionPath: file://./agent-skill-evals/assertions.js

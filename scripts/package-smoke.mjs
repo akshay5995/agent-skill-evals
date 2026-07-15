@@ -36,13 +36,13 @@ try {
   await writeFile(join(consumer, "agent.mjs"), 'console.log(JSON.stringify({ type: "agent_message", message: "PACKED_SMOKE_OK", usage: { total_tokens: 1 } }));\n');
   await writeFile(join(consumer, "promptfooconfig.yaml"), `prompts: ["{{prompt}}"]
 providers:
-  - id: file://./agent-skill-evals/agent.js
+  - id: file://./agent-skill-evals/agent.mjs
     config:
       adapter: codex-json
       command: node
       args: [../agent.mjs]
 tests:
-  path: file://./agent-skill-evals/test-generator.js
+  path: file://./agent-skill-evals/test-generator.mjs
   config:
     path: ./tests/smoke-skill.yaml
     assertionPath: file://./agent-skill-evals/assertions.js
