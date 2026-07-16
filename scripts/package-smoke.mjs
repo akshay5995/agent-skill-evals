@@ -20,7 +20,7 @@ try {
   if (!tarball) throw new Error("packed agent-skill-evals tarball not found");
 
   await writeFile(join(consumer, "package.json"), JSON.stringify({ name: "packed-consumer", private: true, type: "module" }, null, 2));
-  await runPnpm(["add", "promptfoo@^0.121.13", tarball], consumer);
+  await runPnpm(["add", "--ignore-scripts", "promptfoo@^0.121.13", tarball], consumer);
   await writeFile(join(consumer, "imports.mjs"), [
     'await import("agent-skill-evals/agent");',
     'await import("agent-skill-evals/assertions");',
