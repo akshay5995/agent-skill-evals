@@ -1,29 +1,19 @@
 {
   "name": "agent-skill-evals",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Promptfoo-native toolkit for evaluating reusable agent skills",
   "type": "module",
-  "packageManager": "pnpm@10.33.3+sha512.a19744364a7e248b92657a4ca5973f9354d21caf982579674b1c539f32c7420c47138ad8b1254df07aba9bc782d9b3029e3db34d5dbff974326eb74dac8ff489",
+  "packageManager": "pnpm@11.13.1",
   "engines": {
-    "node": "^20.20.0 || >=22.22.0",
-    "pnpm": "10.33.3"
+    "node": ">=22.22.0",
+    "pnpm": "11.13.1"
   },
   "workspaces": [
     "docs",
     "packages/*",
     "examples"
   ],
-  "pnpm": {
-    "overrides": {
-      "axios": "1.16.1",
-      "form-data@>=4.0.0 <4.0.6": "4.0.6",
-      "protobufjs@<=7.6.0": "7.6.1",
-      "vite@<=6.4.2": "6.4.3",
-      "protobufjs@>=8.0.0 <=8.4.0": "8.4.1",
-      "ws@>=8.0.0 <8.21.0": "8.21.0"
-    }
-  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",

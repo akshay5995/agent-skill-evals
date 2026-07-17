@@ -20,7 +20,7 @@ try {
   if (!tarball) throw new Error("packed agent-skill-evals tarball not found");
 
   await writeFile(join(consumer, "package.json"), JSON.stringify({ name: "packed-consumer", private: true, type: "module" }, null, 2));
-  await runPnpm(["add", "promptfoo@^0.121.13", tarball], consumer);
+  await runPnpm(["add", "--ignore-scripts", "promptfoo@^0.121.13", tarball], consumer);
   await writeFile(join(consumer, "imports.mjs"), [
     'await import("agent-skill-evals/agent");',
     'await import("agent-skill-evals/assertions");',
@@ -36,13 +36,13 @@ try {
   await writeFile(join(consumer, "agent.mjs"), 'console.log(JSON.stringify({ type: "agent_message", message: "PACKED_SMOKE_OK", usage: { total_tokens: 1 } }));\n');
   await writeFile(join(consumer, "promptfooconfig.yaml"), `prompts: ["{{prompt}}"]
 providers:
-  - id: file://./agent-skill-evals/agent.js
+  - id: file://./agent-skill-evals/agent.mjs
     config:
       adapter: codex-json
       command: node
       args: [../agent.mjs]
 tests:
-  path: file://./agent-skill-evals/test-generator.js
+  path: file://./agent-skill-evals/test-generator.mjs
   config:
     path: ./tests/smoke-skill.yaml
     assertionPath: file://./agent-skill-evals/assertions.js

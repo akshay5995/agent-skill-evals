@@ -12,9 +12,9 @@ describe("agent-skill-evals init scaffold", () => {
       expect(result.errors).toEqual([]);
       expect(result.created.sort()).toEqual(
         [
-          "agent-skill-evals/agent.js",
+          "agent-skill-evals/agent.mjs",
           "agent-skill-evals/assertions.js",
-          "agent-skill-evals/test-generator.js",
+          "agent-skill-evals/test-generator.mjs",
           "promptfooconfig.yaml",
           "tests/release-notes.yaml",
         ].sort(),
@@ -24,7 +24,7 @@ describe("agent-skill-evals init scaffold", () => {
 
       const config = readFileSync(join(dir, "promptfooconfig.yaml"), "utf8");
       expect(config).toContain("preset: codex");
-      expect(config).toContain("path: file://./agent-skill-evals/test-generator.js");
+      expect(config).toContain("path: file://./agent-skill-evals/test-generator.mjs");
       expect(config).toContain("path: ./tests/release-notes.yaml");
 
       const testPack = readFileSync(join(dir, "tests/release-notes.yaml"), "utf8");
