@@ -10,10 +10,16 @@ export interface PreparedSkillEnvironment {
   formatPrompt: (prompt: string) => string;
 }
 
-interface DeclaredSkill {
+export interface DeclaredSkill {
   source: string;
   name: string;
   role: SkillRole;
+}
+
+export type SkillDelivery = "native" | "mcp";
+
+export function skillDeliveryFromVars(vars: Record<string, unknown>): SkillDelivery {
+  return vars.skillDelivery === "mcp" ? "mcp" : "native";
 }
 
 const BUILTIN_DISTRACTOR_NAME = "agent-skill-evals-neutral";
@@ -93,7 +99,7 @@ async function makeBuiltinDistractor(runDir: string): Promise<string> {
   return dir;
 }
 
-async function declaredSkills(input: {
+export async function declaredSkills(input: {
   runDir: string;
   vars: Record<string, unknown>;
   baseDir: string;
@@ -130,6 +136,10 @@ function explicitPrompt(preset: string | undefined, name: string, prompt: string
   return `$${name}\n\n${prompt}`;
 }
 
+function explicitMcpPrompt(name: string, prompt: string): string {
+  return `Load the "${name}" skill by calling the load_${name}_skill tool on the "skills" MCP server, then follow its instructions.\n\n${prompt}`;
+}
+
 function insertBeforeStdin(args: readonly string[], additions: readonly string[]): string[] {
   const copy = [...args];
   const marker = copy.lastIndexOf("-");
@@ -150,14 +160,23 @@ export async function prepareSkillEnvironment(input: {
   prompt: string;
   evidence: EvidenceCollector;
   extraEnv?: NodeJS.ProcessEnv;
+  skills?: DeclaredSkill[];
 }): Promise<PreparedSkillEnvironment> {
-  const skills = await declaredSkills(input);
+  const skills = input.skills ?? await declaredSkills(input);
+  const delivery = skillDeliveryFromVars(input.vars);
   const isolatedHome = input.authHome ?? join(input.runDir, "home");
   await prepareAuthHome(isolatedHome);
   const env = { ...minimalEnvironment(process.env, isolatedHome), ...(input.extraEnv ?? {}) };
   const piSkillPaths: string[] = [];
 
   for (const skill of skills) {
+    if (delivery === "mcp") {
+      // The built-in MCP skill server serves skills straight from their
+      // source directories; nothing is installed into the World.
+      if (!(await pathExists(skill.source))) throw new Error(`declared skill does not exist: ${skill.source}`);
+      input.evidence.addSkillAvailable({ skill: skill.name, path: skill.source, role: skill.role });
+      continue;
+    }
     const codexPath = join(input.worldPath, ".agents", "skills", skill.name);
     const claudePath = join(input.worldPath, ".claude", "skills", skill.name);
     const isolatedPath = join(input.runDir, "skills", skill.name);
@@ -169,7 +188,7 @@ export async function prepareSkillEnvironment(input: {
   }
 
   let args = [...input.args];
-  if (input.preset === "pi" || input.adapter === "pi-json") {
+  if (delivery === "native" && (input.preset === "pi" || input.adapter === "pi-json")) {
     const skillArgs = ["--no-skills", ...piSkillPaths.flatMap((path) => ["--skill", path])];
     args = insertBeforeStdin(args, skillArgs);
   }
@@ -180,7 +199,9 @@ export async function prepareSkillEnvironment(input: {
     env,
     args,
     formatPrompt: behavior
-      ? (prompt) => explicitPrompt(input.preset, target!.name, prompt)
+      ? (prompt) => delivery === "mcp"
+        ? explicitMcpPrompt(target!.name, prompt)
+        : explicitPrompt(input.preset, target!.name, prompt)
       : (prompt) => prompt,
   };
 }

@@ -61,6 +61,11 @@ function starterTestPack(skillPathFromPack: string, skillName: string): string {
   return `# yaml-language-server: $schema=../node_modules/agent-skill-evals/schema/test-pack.schema.json
 skill: ${skillPathFromPack}
 
+# Serve skills through the built-in MCP skill server instead of installing
+# them on disk. Required for trustworthy routing evidence; codex and
+# claude-code adapters only.
+# skill_delivery: mcp
+
 tests:
   - description: ${skillName} produces the expected result
     prompt: "TODO: replace with a realistic request this skill should handle."

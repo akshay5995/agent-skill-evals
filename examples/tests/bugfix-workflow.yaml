@@ -41,3 +41,13 @@ tests:
       - file.contains: { path: issue-status.log, text: LOGIN-123 confirmed }
       - file.changes_within: { paths: [app.js, issue-status.log] }
     budget: { max_total_tokens: 300000 }
+
+  - description: routes to the bugfix workflow when skills are served over MCP
+    mode: routing
+    skill_delivery: mcp
+    prompt: Fix the login redirect so successful logins go to /dashboard.
+    fixture: ../fixtures/login-bug
+    expect:
+      - skill.loaded: { skills: [bugfix-workflow], delivery: mcp }
+      - skill.not_loaded: { skills: [agent-skill-evals-neutral] }
+    budget: { max_total_tokens: 300000 }

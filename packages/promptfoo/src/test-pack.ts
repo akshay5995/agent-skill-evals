@@ -44,6 +44,8 @@ export const ConversationSchema = z
     }
   });
 
+export const RESERVED_SKILL_SERVER_MOCK_NAME = "skills";
+
 const MockBaseSchema = z.object({
   name: NonEmptyString,
 });
@@ -83,9 +85,12 @@ const BudgetSchema = z.object({
 
 const PromptfooAssertionSchema = z.record(z.string(), z.unknown());
 
+export const SkillDeliverySchema = z.enum(["native", "mcp"]);
+
 export const CleanTestCaseSchema = z.object({
   description: z.string().optional(),
   mode: z.enum(["behavior", "routing"]).default("behavior"),
+  skill_delivery: SkillDeliverySchema.optional(),
   prompt: NonEmptyString,
   fixture: NonEmptyString.optional(),
   setup: z.array(NonEmptyString).default([]),
@@ -105,10 +110,27 @@ export const CleanTestPackSchema = z.object({
   supporting_skills: z.array(NonEmptyString).default([]),
   distractor_skills: z.array(NonEmptyString).default([]),
   builtin_distractor: z.boolean().default(true),
+  skill_delivery: SkillDeliverySchema.default("native"),
   environment: z.object({ mocks: z.array(MockServiceSchema).default([]) }).optional(),
   tests: z.array(CleanTestCaseSchema).min(1),
 }).superRefine((pack, ctx) => {
+  const anyMcpDelivery = pack.tests.some((test) => (test.skill_delivery ?? pack.skill_delivery) === "mcp");
+  if (anyMcpDelivery && (pack.environment?.mocks ?? []).some((mock) => mock.name === RESERVED_SKILL_SERVER_MOCK_NAME)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["environment", "mocks"],
+      message: `the Mock Service name "${RESERVED_SKILL_SERVER_MOCK_NAME}" is reserved for the built-in skill server when skill_delivery is mcp`,
+    });
+  }
   pack.tests.forEach((test, index) => {
+    if ((test.skill_delivery ?? pack.skill_delivery) === "mcp"
+      && (test.environment?.mocks ?? []).some((mock) => mock.name === RESERVED_SKILL_SERVER_MOCK_NAME)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["tests", index, "environment", "mocks"],
+        message: `the Mock Service name "${RESERVED_SKILL_SERVER_MOCK_NAME}" is reserved for the built-in skill server when skill_delivery is mcp`,
+      });
+    }
     if (test.mode !== "routing") return;
     const distractors = [
       ...pack.distractor_skills,
@@ -230,6 +252,7 @@ export function toPromptfooTests(
         ...(options.testPackDir ? { testPackDir: options.testPackDir } : {}),
         skillPath: pack.skill,
         mode: test.mode,
+        skillDelivery: test.skill_delivery ?? pack.skill_delivery,
         supportingSkills,
         distractorSkills,
         builtinDistractor: test.mode === "routing" && pack.builtin_distractor,

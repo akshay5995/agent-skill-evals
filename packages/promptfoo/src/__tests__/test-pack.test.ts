@@ -118,6 +118,47 @@ describe("clean Test Pack", () => {
     });
   });
 
+  it("defaults skill delivery to native and lets a test override the pack", () => {
+    const parsed = parseTestPackDocument(cleanPack);
+    expect(parsed.skill_delivery).toBe("native");
+
+    const mcpPack = parseTestPackDocument({
+      ...cleanPack,
+      skill_delivery: "mcp",
+      tests: [
+        cleanPack.tests[0],
+        { ...cleanPack.tests[1], skill_delivery: "native" },
+      ],
+    });
+    const tests = toPromptfooTests(mcpPack, { assertionPath: "file://assertions.js" });
+    expect(tests[0]?.vars).toMatchObject({ skillDelivery: "mcp" });
+    expect(tests[1]?.vars).toMatchObject({ skillDelivery: "native" });
+  });
+
+  it("reserves the \"skills\" Mock Service name under mcp delivery", () => {
+    const reservedMock = { name: "skills", kind: "mcp", command: "node" };
+    expect(() =>
+      parseTestPackDocument({
+        ...cleanPack,
+        skill_delivery: "mcp",
+        environment: { mocks: [reservedMock] },
+      }),
+    ).toThrow(/"skills" is reserved/);
+    expect(() =>
+      parseTestPackDocument({
+        ...cleanPack,
+        tests: [{ ...cleanPack.tests[0], skill_delivery: "mcp", environment: { mocks: [reservedMock] } }],
+      }),
+    ).toThrow(/"skills" is reserved/);
+    // Native delivery keeps the name available.
+    expect(() =>
+      parseTestPackDocument({
+        ...cleanPack,
+        environment: { mocks: [reservedMock] },
+      }),
+    ).not.toThrow();
+  });
+
   it("loads YAML through the same parser used by the Promptfoo generator", async () => {
     const root = mkdtempSync(join(tmpdir(), "agent-skill-evals-pack-"));
     mkdirSync(join(root, "tests"), { recursive: true });

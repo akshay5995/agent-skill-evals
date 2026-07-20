@@ -7,6 +7,7 @@ export default defineConfig({
     "assertions/index": "src/assertions/index.ts",
     "test-generator/index": "src/test-pack.ts",
     "cli/init": "src/cli/init.ts",
+    "mcp/skill-server": "src/mcp/skill-server.ts",
   },
   dts: true,
   format: "esm",

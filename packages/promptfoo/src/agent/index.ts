@@ -19,9 +19,10 @@ import {
 import { captureCliVersion, expandEnvVars, resolveConfiguredPath } from "./invocation.js";
 import { makeSimulatedUserRunner } from "./simulated-user.js";
 import { persistMetadata, type AgentSkillEvalsProviderMetadata } from "./metadata.js";
-import { prepareSkillEnvironment } from "./skill-environment.js";
+import { declaredSkills, prepareSkillEnvironment, skillDeliveryFromVars, type DeclaredSkill } from "./skill-environment.js";
+import { resolveSkillServerEntry } from "./skill-server-entry.js";
 import { startMockServices, stopMockServices } from "./mock-services.js";
-import type { MockService } from "../test-pack.js";
+import { RESERVED_SKILL_SERVER_MOCK_NAME, type MockService } from "../test-pack.js";
 import { join } from "node:path";
 
 interface PromptfooContext {
@@ -149,6 +150,7 @@ async function runConfiguredAdapter(input: {
   vars: Record<string, unknown>;
   runtimeEnv?: NodeJS.ProcessEnv;
   runtimeArgs?: readonly string[];
+  skills?: DeclaredSkill[];
 }): Promise<{ output: string; error?: string }> {
   const adapterId = input.config.adapter;
   if (!adapterId) {
@@ -207,6 +209,7 @@ async function runConfiguredAdapter(input: {
       prompt: input.prompt,
       evidence: input.run.evidenceCollector,
       extraEnv: input.runtimeEnv,
+      ...(input.skills ? { skills: input.skills } : {}),
     });
   } catch (error) {
     return {
@@ -344,10 +347,46 @@ class AgentSkillEvalsProvider {
       : {};
     const mocks = Array.isArray(environment.mocks) ? environment.mocks as MockService[] : [];
     const mockBaseDir = testPackDir ?? this.config.baseDir ?? process.cwd();
+
+    let skills: DeclaredSkill[] | undefined;
+    let allMocks: MockService[] = mocks;
+    if (skillDeliveryFromVars(vars) === "mcp") {
+      if (this.config.preset === "pi" || this.config.adapter === "pi-json") {
+        return {
+          output: "",
+          error: "agent-skill-evals-provider: skill_delivery: mcp requires the codex or claude-code preset; the Pi CLI has no built-in MCP config flag.",
+        };
+      }
+      if (mocks.some((mock) => mock.name === RESERVED_SKILL_SERVER_MOCK_NAME)) {
+        return {
+          output: "",
+          error: `agent-skill-evals-provider: the Mock Service name "${RESERVED_SKILL_SERVER_MOCK_NAME}" is reserved for the built-in skill server when skill_delivery is mcp.`,
+        };
+      }
+      try {
+        skills = await declaredSkills({ runDir: prepared.runDir, vars, baseDir: mockBaseDir });
+        if (skills.length > 0) {
+          allMocks = [...mocks, {
+            name: RESERVED_SKILL_SERVER_MOCK_NAME,
+            kind: "mcp",
+            transport: "stdio",
+            command: process.execPath,
+            args: [resolveSkillServerEntry(), ...skills.map((skill) => skill.source)],
+            provides_skill_evidence: true,
+          }];
+        }
+      } catch (error) {
+        return {
+          output: "",
+          error: `agent-skill-evals-provider: failed to prepare MCP skill delivery: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
+
     let mockServices;
     try {
       mockServices = await startMockServices({
-        mocks,
+        mocks: allMocks,
         runDir: prepared.runDir,
         baseDir: mockBaseDir,
         preset: this.config.preset,
@@ -389,6 +428,7 @@ class AgentSkillEvalsProvider {
         vars,
         runtimeEnv: mockServices.env,
         runtimeArgs: mockServices.args,
+        ...(skills ? { skills } : {}),
       });
       output = result.output;
       error = result.error;

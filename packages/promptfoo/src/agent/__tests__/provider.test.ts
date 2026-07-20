@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AgentSkillEvalsProvider } from "../index.js";
@@ -493,5 +493,189 @@ describe("AgentSkillEvalsProvider", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("AgentSkillEvalsProvider with skill_delivery: mcp", () => {
+  let dir: string;
+  let skill: string;
+  let savedServerOverride: string | undefined;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "agent-skill-evals-mcp-delivery-"));
+    skill = join(dir, "skills", "demo");
+    mkdirSync(skill, { recursive: true });
+    writeFileSync(join(skill, "SKILL.md"), "---\nname: demo\ndescription: Use when testing demo routing. Do not use otherwise.\n---\n\nHandle the demo.\n");
+    savedServerOverride = process.env.AGENT_SKILL_EVALS_SKILL_SERVER;
+    process.env.AGENT_SKILL_EVALS_SKILL_SERVER = join(dir, "fake-skill-server.mjs");
+  });
+
+  afterEach(() => {
+    if (savedServerOverride === undefined) delete process.env.AGENT_SKILL_EVALS_SKILL_SERVER;
+    else process.env.AGENT_SKILL_EVALS_SKILL_SERVER = savedServerOverride;
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("wires the built-in skill server into codex MCP config and skips native install", async () => {
+    const agent = join(dir, "argv-agent.mjs");
+    writeFileSync(
+      agent,
+      "console.log(JSON.stringify({ type: 'agent_message', message: JSON.stringify(process.argv.slice(2)) }));",
+    );
+
+    const provider = new AgentSkillEvalsProvider({
+      config: { preset: "codex", adapter: "codex-json", command: "node", args: [agent], baseDir: dir },
+    });
+    const response = await provider.callApi("Choose the right skill", {
+      vars: {
+        skillPath: "./skills/demo",
+        testPackDir: dir,
+        mode: "routing",
+        skillDelivery: "mcp",
+        builtinDistractor: true,
+      },
+    });
+
+    expect(response.error).toBeUndefined();
+    const argv = JSON.parse(response.output) as string[];
+    const configPairs = argv.filter((arg) => arg.startsWith("mcp_servers.skills."));
+    expect(configPairs.some((arg) => arg.startsWith("mcp_servers.skills.command="))).toBe(true);
+    const argsPair = configPairs.find((arg) => arg.startsWith("mcp_servers.skills.args="));
+    expect(argsPair).toContain("fake-skill-server.mjs");
+    expect(argsPair).toContain(skill);
+    expect(argsPair).toContain("agent-skill-evals-neutral");
+
+    const worldPath = response.metadata?.worldPath as string;
+    expect(existsSync(join(worldPath, ".claude", "skills"))).toBe(false);
+    expect(existsSync(join(worldPath, ".agents", "skills"))).toBe(false);
+    const evidence = JSON.parse(readFileSync(response.metadata?.evidencePath as string, "utf8")) as {
+      skillsAvailable: Array<{ skill: string; path: string; role: string }>;
+    };
+    expect(evidence.skillsAvailable).toContainEqual({ skill: "demo", path: skill, role: "under-test" });
+  });
+
+  it("writes mcp-config.json for the claude-code preset", async () => {
+    const agent = join(dir, "claude-agent.mjs");
+    writeFileSync(
+      agent,
+      [
+        "const flag = process.argv.indexOf('--mcp-config');",
+        "console.log(JSON.stringify({ type: 'result', result: process.argv[flag + 1] ?? 'missing' }));",
+      ].join("\n"),
+    );
+
+    const provider = new AgentSkillEvalsProvider({
+      config: { preset: "claude-code", adapter: "claude-code-json", command: "node", args: [agent], baseDir: dir },
+    });
+    const response = await provider.callApi("Choose the right skill", {
+      vars: {
+        skillPath: "./skills/demo",
+        testPackDir: dir,
+        mode: "routing",
+        skillDelivery: "mcp",
+        builtinDistractor: false,
+      },
+    });
+
+    expect(response.error).toBeUndefined();
+    const config = JSON.parse(readFileSync(response.output, "utf8")) as {
+      mcpServers: Record<string, { command: string; args: string[] }>;
+    };
+    expect(config.mcpServers.skills).toBeDefined();
+    expect(config.mcpServers.skills!.args).toContain(skill);
+  });
+
+  it("instructs behavior-mode prompts to load the skill through MCP", async () => {
+    const agent = join(dir, "prompt-agent.mjs");
+    writeFileSync(
+      agent,
+      "console.log(JSON.stringify({ type: 'agent_message', message: process.argv.at(-1) }));",
+    );
+
+    const provider = new AgentSkillEvalsProvider({
+      config: { preset: "codex", adapter: "codex-json", command: "node", args: [agent], baseDir: dir },
+    });
+    const response = await provider.callApi("Do the demo work.", {
+      vars: {
+        skillPath: "./skills/demo",
+        testPackDir: dir,
+        mode: "behavior",
+        skillDelivery: "mcp",
+      },
+    });
+
+    expect(response.error).toBeUndefined();
+    expect(response.output).toBe(
+      'Load the "demo" skill by calling the load_demo_skill tool on the "skills" MCP server, then follow its instructions.\n\nDo the demo work.',
+    );
+  });
+
+  it("grades routing from load tool calls observed on the skills server", async () => {
+    const agent = join(dir, "routing-agent.mjs");
+    writeFileSync(
+      agent,
+      [
+        "console.log(JSON.stringify({ type: 'item.completed', item: { type: 'mcp_tool_call', server: 'skills', tool: 'load_demo_skill', arguments: {}, result: 'ok' } }));",
+        "console.log(JSON.stringify({ type: 'agent_message', message: 'done' }));",
+      ].join("\n"),
+    );
+
+    const provider = new AgentSkillEvalsProvider({
+      config: { preset: "codex", adapter: "codex-json", command: "node", args: [agent], baseDir: dir },
+    });
+    const assertions = [
+      { "skill.loaded": { skills: ["demo"], delivery: "mcp" } },
+      { "skill.not_loaded": { skills: ["agent-skill-evals-neutral"] } },
+    ];
+    const response = await provider.callApi("Choose the right skill", {
+      vars: {
+        skillPath: "./skills/demo",
+        testPackDir: dir,
+        mode: "routing",
+        skillDelivery: "mcp",
+        builtinDistractor: true,
+        expect: assertions,
+      },
+    });
+    const graded = await skillTest(response.output, {
+      providerResponse: { metadata: response.metadata },
+      vars: { expect: assertions },
+    });
+
+    expect(response.error).toBeUndefined();
+    expect(graded.pass).toBe(true);
+    const evidence = JSON.parse(readFileSync(response.metadata?.evidencePath as string, "utf8")) as {
+      skillsLoaded: Array<{ skill: string; delivery: string; server?: string }>;
+    };
+    expect(evidence.skillsLoaded).toContainEqual(
+      expect.objectContaining({ skill: "demo", delivery: "mcp", server: "skills" }),
+    );
+  });
+
+  it("rejects the pi preset", async () => {
+    const provider = new AgentSkillEvalsProvider({
+      config: { preset: "pi", adapter: "pi-json", command: "node", args: [], baseDir: dir },
+    });
+    const response = await provider.callApi("Do the demo work.", {
+      vars: { skillPath: "./skills/demo", testPackDir: dir, skillDelivery: "mcp" },
+    });
+
+    expect(response.error).toMatch(/skill_delivery: mcp requires the codex or claude-code preset/);
+  });
+
+  it("rejects a user Mock Service that squats the reserved skills name", async () => {
+    const provider = new AgentSkillEvalsProvider({
+      config: { preset: "codex", adapter: "codex-json", command: "node", args: [], baseDir: dir },
+    });
+    const response = await provider.callApi("Do the demo work.", {
+      vars: {
+        skillPath: "./skills/demo",
+        testPackDir: dir,
+        skillDelivery: "mcp",
+        environment: { mocks: [{ name: "skills", kind: "mcp", transport: "stdio", command: "node", args: [] }] },
+      },
+    });
+
+    expect(response.error).toMatch(/"skills" is reserved/);
   });
 });

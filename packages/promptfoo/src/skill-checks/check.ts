@@ -108,6 +108,14 @@ function checkSkillQuality(skill: ParsedSkill): CheckDiagnostic[] {
   return out;
 }
 
+function effectiveDelivery(test: CleanTestCase, pack: CleanTestPack): "native" | "mcp" {
+  return test.skill_delivery ?? pack.skill_delivery;
+}
+
+function declaredSkillName(path: string): string {
+  return basename(path.replace(/\/+$/, "")).replace(/\.md$/i, "");
+}
+
 function checkName(entry: unknown): string | undefined {
   if (typeof entry === "string") return entry;
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) return undefined;
@@ -209,22 +217,45 @@ async function checkCase(
   if (test.mode === "routing" && hasDistractors && !expectedChecks.includes("skill.not_loaded")) {
     out.push(diagnostic("error", "routing.skill_not_loaded.required", "Routing Tests with distractors must prove that unrelated skills were not loaded."));
   }
-  const hasSkillEvidence = mocks.some(
-    (mock) => mock.kind === "mcp" && mock.provides_skill_evidence,
-  );
+  const delivery = effectiveDelivery(test, pack);
+  const hasSkillEvidence =
+    delivery === "mcp" ||
+    mocks.some((mock) => mock.kind === "mcp" && mock.provides_skill_evidence);
   if (test.mode === "routing" && expectedChecks.includes("skill.loaded") && !hasSkillEvidence) {
     out.push(diagnostic(
       "error",
       "routing.observation.unsupported",
       "Native skill discovery does not currently expose trustworthy load evidence for routing assertions.",
       undefined,
-      "Add an MCP boundary that emits observable skill-load telemetry and set provides_skill_evidence: true.",
+      "Set skill_delivery: mcp to serve skills through the built-in MCP skill server, or add an MCP boundary that emits observable skill-load telemetry and set provides_skill_evidence: true.",
     ));
   }
   if (!test.budget) {
     out.push(diagnostic("warning", "budget.missing", `Test "${test.description ?? test.prompt}" has no token budget.`, undefined, "Add a budget after observing a representative passing run."));
   }
   return out;
+}
+
+function checkMcpSkillNames(pack: CleanTestPack): CheckDiagnostic[] {
+  const names = new Set<string>();
+  for (const test of pack.tests) {
+    if (effectiveDelivery(test, pack) !== "mcp") continue;
+    for (const path of [
+      pack.skill,
+      ...(test.supporting_skills ?? pack.supporting_skills),
+      ...pack.distractor_skills,
+      ...(test.distractor_skills ?? []),
+    ]) {
+      names.add(declaredSkillName(path));
+    }
+  }
+  return [...names].filter((name) => name.includes("_")).map((name) => diagnostic(
+    "warning",
+    "skill.name.underscore",
+    `Skill "${name}" contains an underscore; MCP load evidence normalizes underscores to hyphens, so skill.loaded assertions on "${name}" will never match.`,
+    undefined,
+    `Rename the skill directory to "${name.replace(/_/g, "-")}" or assert on the hyphenated name.`,
+  ));
 }
 
 export async function checkSkillProject(
@@ -261,6 +292,7 @@ export async function checkSkillProject(
       diagnostics.push(diagnostic("error", "test_pack.skill_mismatch", `Test Pack declares ${pack.skill}, which does not match the checked skill.`, declaredSkill, `Set skill: ${options.skillPath}`));
     }
     for (const test of pack.tests) diagnostics.push(...await checkCase(test, pack, dirname(testPack)));
+    diagnostics.push(...checkMcpSkillNames(pack));
   }
 
   const hasErrors = diagnostics.some((item) => item.level === "error");

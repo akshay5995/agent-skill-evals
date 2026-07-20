@@ -17,7 +17,8 @@
     }
   },
   "bin": {
-    "agent-skill-evals": "./dist/cli/init.mjs"
+    "agent-skill-evals": "./dist/cli/init.mjs",
+    "agent-skill-evals-skill-server": "./dist/mcp/skill-server.mjs"
   },
   "scripts": {
     "build": "tsdown",
@@ -25,6 +26,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "yaml": "^2.6.0",
     "zod": "^4.4.3"
   },

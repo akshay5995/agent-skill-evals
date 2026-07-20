@@ -246,6 +246,63 @@ describe("agent-skill-evals check", () => {
     }));
   });
 
+  it("accepts routing assertions without user mocks when skills are served via MCP", async () => {
+    const root = makeProject();
+    writeFileSync(
+      join(root, "tests", "demo.yaml"),
+      [
+        "skill: ../skills/demo",
+        "skill_delivery: mcp",
+        "tests:",
+        "  - mode: routing",
+        "    prompt: Do the demo task",
+        "    expect:",
+        "      - skill.loaded: { skills: [demo] }",
+        "      - skill.not_loaded: { skills: [agent-skill-evals-neutral] }",
+      ].join("\n"),
+    );
+
+    const result = await checkSkillProject({
+      cwd: root,
+      skillPath: "./skills/demo",
+      testPackPath: "./tests/demo.yaml",
+    });
+
+    expect(result.diagnostics.map((item) => item.code)).not.toContain("routing.observation.unsupported");
+  });
+
+  it("warns about underscore skill names under MCP delivery", async () => {
+    const root = makeProject();
+    mkdirSync(join(root, "skills", "other_skill"), { recursive: true });
+    writeFileSync(join(root, "skills", "other_skill", "SKILL.md"), "---\nname: other_skill\ndescription: Use when asked for other work. Do not use for demos.\n---\n");
+    writeFileSync(
+      join(root, "tests", "demo.yaml"),
+      [
+        "skill: ../skills/demo",
+        "skill_delivery: mcp",
+        "builtin_distractor: false",
+        "tests:",
+        "  - mode: routing",
+        "    prompt: Do the demo task",
+        "    distractor_skills: [../skills/other_skill]",
+        "    expect:",
+        "      - skill.loaded: { skills: [demo] }",
+        "      - skill.not_loaded: { skills: [other-skill] }",
+      ].join("\n"),
+    );
+
+    const result = await checkSkillProject({
+      cwd: root,
+      skillPath: "./skills/demo",
+      testPackPath: "./tests/demo.yaml",
+    });
+
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: "skill.name.underscore",
+      level: "warning",
+    }));
+  });
+
   it("checks absolute mock file paths", async () => {
     const root = makeProject();
     const missing = join(root, "missing-server.mjs");

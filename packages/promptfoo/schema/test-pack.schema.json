@@ -15,11 +15,14 @@
     "builtin_distractor": {
       "$ref": "#/definitions/__schema3"
     },
-    "environment": {
+    "skill_delivery": {
       "$ref": "#/definitions/__schema4"
     },
-    "tests": {
+    "environment": {
       "$ref": "#/definitions/__schema6"
+    },
+    "tests": {
+      "$ref": "#/definitions/__schema8"
     }
   },
   "required": [
@@ -50,18 +53,33 @@
       "type": "boolean"
     },
     "__schema4": {
+      "default": "native",
+      "allOf": [
+        {
+          "$ref": "#/definitions/__schema5"
+        }
+      ]
+    },
+    "__schema5": {
+      "type": "string",
+      "enum": [
+        "native",
+        "mcp"
+      ]
+    },
+    "__schema6": {
       "type": "object",
       "properties": {
         "mocks": {
           "default": [],
           "type": "array",
           "items": {
-            "$ref": "#/definitions/__schema5"
+            "$ref": "#/definitions/__schema7"
           }
         }
       }
     },
-    "__schema5": {
+    "__schema7": {
       "oneOf": [
         {
           "type": "object",
@@ -203,14 +221,14 @@
         }
       ]
     },
-    "__schema6": {
+    "__schema8": {
       "minItems": 1,
       "type": "array",
       "items": {
-        "$ref": "#/definitions/__schema7"
+        "$ref": "#/definitions/__schema9"
       }
     },
-    "__schema7": {
+    "__schema9": {
       "type": "object",
       "properties": {
         "description": {
@@ -222,6 +240,13 @@
           "enum": [
             "behavior",
             "routing"
+          ]
+        },
+        "skill_delivery": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/__schema5"
+            }
           ]
         },
         "prompt": {
@@ -257,27 +282,27 @@
           "default": [],
           "type": "array",
           "items": {
-            "$ref": "#/definitions/__schema8"
+            "$ref": "#/definitions/__schema10"
           }
         },
         "expect": {
           "minItems": 1,
           "type": "array",
           "items": {
-            "$ref": "#/definitions/__schema8"
+            "$ref": "#/definitions/__schema10"
           }
         },
         "conversation": {
           "type": "object",
           "properties": {
             "max_turns": {
-              "$ref": "#/definitions/__schema16"
+              "$ref": "#/definitions/__schema18"
             },
             "scripted_user": {
-              "$ref": "#/definitions/__schema17"
+              "$ref": "#/definitions/__schema19"
             },
             "simulated_user": {
-              "$ref": "#/definitions/__schema18"
+              "$ref": "#/definitions/__schema20"
             }
           }
         },
@@ -285,16 +310,16 @@
           "type": "object",
           "properties": {
             "max_total_tokens": {
-              "$ref": "#/definitions/__schema19"
-            },
-            "max_prompt_tokens": {
-              "$ref": "#/definitions/__schema20"
-            },
-            "max_completion_tokens": {
               "$ref": "#/definitions/__schema21"
             },
-            "max_cached_tokens": {
+            "max_prompt_tokens": {
               "$ref": "#/definitions/__schema22"
+            },
+            "max_completion_tokens": {
+              "$ref": "#/definitions/__schema23"
+            },
+            "max_cached_tokens": {
+              "$ref": "#/definitions/__schema24"
             }
           }
         },
@@ -321,7 +346,7 @@
               "default": [],
               "type": "array",
               "items": {
-                "$ref": "#/definitions/__schema5"
+                "$ref": "#/definitions/__schema7"
               }
             }
           }
@@ -339,13 +364,13 @@
         "expect"
       ]
     },
-    "__schema8": {
+    "__schema10": {
       "anyOf": [
         {
           "type": "object",
           "properties": {
             "verifier.succeeds": {
-              "$ref": "#/definitions/__schema9"
+              "$ref": "#/definitions/__schema11"
             }
           },
           "required": [
@@ -357,7 +382,7 @@
           "type": "object",
           "properties": {
             "verifier.fails": {
-              "$ref": "#/definitions/__schema9"
+              "$ref": "#/definitions/__schema11"
             }
           },
           "required": [
@@ -369,7 +394,7 @@
           "type": "object",
           "properties": {
             "file.exists": {
-              "$ref": "#/definitions/__schema11"
+              "$ref": "#/definitions/__schema13"
             }
           },
           "required": [
@@ -381,7 +406,7 @@
           "type": "object",
           "properties": {
             "file.created": {
-              "$ref": "#/definitions/__schema11"
+              "$ref": "#/definitions/__schema13"
             }
           },
           "required": [
@@ -396,7 +421,7 @@
               "type": "object",
               "properties": {
                 "path": {
-                  "$ref": "#/definitions/__schema10"
+                  "$ref": "#/definitions/__schema12"
                 },
                 "text": {
                   "type": "string"
@@ -417,7 +442,7 @@
           "type": "object",
           "properties": {
             "file.unchanged": {
-              "$ref": "#/definitions/__schema11"
+              "$ref": "#/definitions/__schema13"
             }
           },
           "required": [
@@ -435,7 +460,7 @@
                   "minItems": 1,
                   "type": "array",
                   "items": {
-                    "$ref": "#/definitions/__schema10"
+                    "$ref": "#/definitions/__schema12"
                   }
                 }
               },
@@ -456,13 +481,13 @@
               "type": "object",
               "properties": {
                 "tool": {
-                  "$ref": "#/definitions/__schema10"
+                  "$ref": "#/definitions/__schema12"
                 },
                 "provider": {
-                  "$ref": "#/definitions/__schema12"
+                  "$ref": "#/definitions/__schema14"
                 },
                 "server": {
-                  "$ref": "#/definitions/__schema12"
+                  "$ref": "#/definitions/__schema14"
                 },
                 "args_match": {}
               },
@@ -485,18 +510,18 @@
                   "type": "object",
                   "properties": {
                     "tool": {
-                      "$ref": "#/definitions/__schema13"
+                      "$ref": "#/definitions/__schema15"
                     },
                     "provider": {
-                      "$ref": "#/definitions/__schema13"
+                      "$ref": "#/definitions/__schema15"
                     },
                     "server": {
-                      "$ref": "#/definitions/__schema13"
+                      "$ref": "#/definitions/__schema15"
                     },
                     "args_match": {
                       "allOf": [
                         {
-                          "$ref": "#/definitions/__schema14"
+                          "$ref": "#/definitions/__schema16"
                         }
                       ]
                     }
@@ -508,7 +533,7 @@
                       "type": "object",
                       "properties": {
                         "tool": {
-                          "$ref": "#/definitions/__schema10"
+                          "$ref": "#/definitions/__schema12"
                         }
                       },
                       "required": [
@@ -519,7 +544,7 @@
                       "type": "object",
                       "properties": {
                         "provider": {
-                          "$ref": "#/definitions/__schema10"
+                          "$ref": "#/definitions/__schema12"
                         }
                       },
                       "required": [
@@ -530,7 +555,7 @@
                       "type": "object",
                       "properties": {
                         "server": {
-                          "$ref": "#/definitions/__schema10"
+                          "$ref": "#/definitions/__schema12"
                         }
                       },
                       "required": [
@@ -541,7 +566,7 @@
                       "type": "object",
                       "properties": {
                         "args_match": {
-                          "$ref": "#/definitions/__schema14"
+                          "$ref": "#/definitions/__schema16"
                         }
                       },
                       "required": [
@@ -565,13 +590,13 @@
               "type": "object",
               "properties": {
                 "tool": {
-                  "$ref": "#/definitions/__schema12"
+                  "$ref": "#/definitions/__schema14"
                 },
                 "provider": {
-                  "$ref": "#/definitions/__schema12"
+                  "$ref": "#/definitions/__schema14"
                 },
                 "server": {
-                  "$ref": "#/definitions/__schema12"
+                  "$ref": "#/definitions/__schema14"
                 },
                 "args_match": {},
                 "turn": {
@@ -607,7 +632,7 @@
                   "minItems": 2,
                   "type": "array",
                   "items": {
-                    "$ref": "#/definitions/__schema10"
+                    "$ref": "#/definitions/__schema12"
                   }
                 }
               },
@@ -645,7 +670,7 @@
           "type": "object",
           "properties": {
             "skill.loaded": {
-              "$ref": "#/definitions/__schema15"
+              "$ref": "#/definitions/__schema17"
             }
           },
           "required": [
@@ -657,7 +682,7 @@
           "type": "object",
           "properties": {
             "skill.not_loaded": {
-              "$ref": "#/definitions/__schema15"
+              "$ref": "#/definitions/__schema17"
             }
           },
           "required": [
@@ -692,7 +717,7 @@
               "type": "object",
               "properties": {
                 "pattern": {
-                  "$ref": "#/definitions/__schema10"
+                  "$ref": "#/definitions/__schema12"
                 },
                 "flags": {
                   "type": "string"
@@ -710,11 +735,11 @@
         }
       ]
     },
-    "__schema9": {
+    "__schema11": {
       "type": "object",
       "properties": {
         "run": {
-          "$ref": "#/definitions/__schema10"
+          "$ref": "#/definitions/__schema12"
         },
         "args": {
           "type": "array",
@@ -730,32 +755,32 @@
         "run"
       ]
     },
-    "__schema10": {
+    "__schema12": {
       "type": "string",
       "minLength": 1
     },
-    "__schema11": {
+    "__schema13": {
       "type": "object",
       "properties": {
         "path": {
-          "$ref": "#/definitions/__schema10"
+          "$ref": "#/definitions/__schema12"
         }
       },
       "required": [
         "path"
       ]
     },
-    "__schema12": {
+    "__schema14": {
       "type": "string"
     },
-    "__schema13": {
+    "__schema15": {
       "allOf": [
         {
-          "$ref": "#/definitions/__schema10"
+          "$ref": "#/definitions/__schema12"
         }
       ]
     },
-    "__schema14": {
+    "__schema16": {
       "anyOf": [
         {
           "type": "null"
@@ -782,14 +807,14 @@
         }
       ]
     },
-    "__schema15": {
+    "__schema17": {
       "type": "object",
       "properties": {
         "skills": {
           "minItems": 1,
           "type": "array",
           "items": {
-            "$ref": "#/definitions/__schema10"
+            "$ref": "#/definitions/__schema12"
           }
         },
         "delivery": {
@@ -800,32 +825,32 @@
           ]
         },
         "provider": {
-          "$ref": "#/definitions/__schema12"
+          "$ref": "#/definitions/__schema14"
         },
         "server": {
-          "$ref": "#/definitions/__schema12"
+          "$ref": "#/definitions/__schema14"
         },
         "source": {
-          "$ref": "#/definitions/__schema12"
+          "$ref": "#/definitions/__schema14"
         }
       },
       "required": [
         "skills"
       ]
     },
-    "__schema16": {
+    "__schema18": {
       "type": "integer",
       "minimum": 1,
       "maximum": 20
     },
-    "__schema17": {
+    "__schema19": {
       "minItems": 1,
       "type": "array",
       "items": {
         "$ref": "#/definitions/__schema0"
       }
     },
-    "__schema18": {
+    "__schema20": {
       "type": "object",
       "properties": {
         "goal": {
@@ -847,22 +872,22 @@
         "goal"
       ]
     },
-    "__schema19": {
-      "type": "integer",
-      "minimum": 0,
-      "maximum": 9007199254740991
-    },
-    "__schema20": {
-      "type": "integer",
-      "minimum": 0,
-      "maximum": 9007199254740991
-    },
     "__schema21": {
       "type": "integer",
       "minimum": 0,
       "maximum": 9007199254740991
     },
     "__schema22": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "__schema23": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "__schema24": {
       "type": "integer",
       "minimum": 0,
       "maximum": 9007199254740991
