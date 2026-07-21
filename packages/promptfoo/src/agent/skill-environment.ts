@@ -137,7 +137,7 @@ function explicitPrompt(preset: string | undefined, name: string, prompt: string
 }
 
 function explicitMcpPrompt(name: string, prompt: string): string {
-  return `Load the "${name}" skill by calling the load_${name}_skill tool on the "skills" MCP server, then follow its instructions.\n\n${prompt}`;
+  return `Load the "${name}" skill by calling the ${name} tool on the "skills" MCP server, then follow its instructions.\n\n${prompt}`;
 }
 
 function insertBeforeStdin(args: readonly string[], additions: readonly string[]): string[] {

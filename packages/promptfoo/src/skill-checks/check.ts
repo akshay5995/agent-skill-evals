@@ -4,6 +4,7 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { loadTestPack, type CleanTestCase, type CleanTestPack, type MockService } from "../test-pack.js";
 import { parseSkillMd, type ParsedSkill } from "./skill.js";
 import { RUNTIME_CHECK_TYPES } from "../runtime-checks/catalog.js";
+import { MAX_SKILL_NAME_LENGTH, READ_SKILL_FILE_TOOL_NAME } from "../mcp/server.js";
 
 export type DiagnosticLevel = "error" | "warning";
 
@@ -249,13 +250,28 @@ function checkMcpSkillNames(pack: CleanTestPack): CheckDiagnostic[] {
       names.add(declaredSkillName(path));
     }
   }
-  return [...names].filter((name) => name.includes("_")).map((name) => diagnostic(
-    "warning",
-    "skill.name.underscore",
-    `Skill "${name}" contains an underscore; MCP load evidence normalizes underscores to hyphens, so skill.loaded assertions on "${name}" will never match.`,
-    undefined,
-    `Rename the skill directory to "${name.replace(/_/g, "-")}" or assert on the hyphenated name.`,
-  ));
+  const out: CheckDiagnostic[] = [];
+  for (const name of names) {
+    if (name.length > MAX_SKILL_NAME_LENGTH) {
+      out.push(diagnostic(
+        "error",
+        "skill.name.mcp_length",
+        `Skill "${name}" is ${name.length} characters; MCP delivery registers it directly as a tool name, and Claude Code's mcp__skills__${name} wrapping must stay within its 64-character limit.`,
+        undefined,
+        `Shorten the skill directory name to ${MAX_SKILL_NAME_LENGTH} characters or fewer.`,
+      ));
+    }
+    if (name === READ_SKILL_FILE_TOOL_NAME) {
+      out.push(diagnostic(
+        "error",
+        "skill.name.reserved",
+        `Skill name "${name}" collides with the built-in MCP skill server's reserved ${READ_SKILL_FILE_TOOL_NAME} tool.`,
+        undefined,
+        "Rename the skill directory.",
+      ));
+    }
+  }
+  return out;
 }
 
 export async function checkSkillProject(

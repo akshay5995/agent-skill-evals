@@ -15,6 +15,18 @@ export interface SkillManifest {
 
 export const SKILL_SERVER_NAME = "agent-skill-evals-skills";
 
+/** Reserved tool name for reading a skill's supporting files; skills cannot use it. */
+export const READ_SKILL_FILE_TOOL_NAME = "read_skill_file";
+
+/**
+ * Claude Code exposes MCP tools to the model as `mcp__<server>__<tool>` and
+ * the Claude API rejects tool names over 64 characters. The built-in skill
+ * server always registers under the reserved server name "skills" (6 chars),
+ * so `len("mcp__") + len("skills") + len("__")` = 13 chars are already spent
+ * before the skill name itself: 64 - 13 = 51.
+ */
+export const MAX_SKILL_NAME_LENGTH = 51;
+
 function packageVersion(): string {
   try {
     const pkg = createRequire(import.meta.url)("../../package.json") as { version?: string };
@@ -50,6 +62,14 @@ export async function scanSkills(dirs: readonly string[]): Promise<SkillManifest
     if (!hasSkillMd) throw new Error(`skill directory has no SKILL.md: ${dir}`);
     const name = skillName(root);
     if (seen.has(name)) throw new Error(`duplicate skill name: ${name}`);
+    if (name.length > MAX_SKILL_NAME_LENGTH) {
+      throw new Error(
+        `skill name "${name}" is ${name.length} characters; MCP delivery registers it directly as a tool name, and Claude Code's mcp__skills__${name} wrapping must stay within its 64-character limit. Shorten the skill directory name to ${MAX_SKILL_NAME_LENGTH} characters or fewer.`,
+      );
+    }
+    if (name === READ_SKILL_FILE_TOOL_NAME) {
+      throw new Error(`skill name "${name}" collides with the reserved ${READ_SKILL_FILE_TOOL_NAME} tool; rename the skill directory.`);
+    }
     seen.add(name);
     const parsed = await parseSkillMd(skillMdPath);
     const description = typeof parsed.frontmatter.description === "string" && parsed.frontmatter.description.trim().length > 0
@@ -87,7 +107,7 @@ export function buildSkillServer(skills: readonly SkillManifest[]): McpServer {
 
   for (const skill of skills) {
     server.registerTool(
-      `load_${skill.name}_skill`,
+      skill.name,
       { description: skill.description },
       async () => ({ content: [{ type: "text", text: await loadSkillText(skill) }] }),
     );
@@ -104,7 +124,7 @@ export function buildSkillServer(skills: readonly SkillManifest[]): McpServer {
   }
 
   server.registerTool(
-    "read_skill_file",
+    READ_SKILL_FILE_TOOL_NAME,
     {
       description: "Read a supporting file from a skill by its relative path.",
       inputSchema: { skill: z.string(), path: z.string() },

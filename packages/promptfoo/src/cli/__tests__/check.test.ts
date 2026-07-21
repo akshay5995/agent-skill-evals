@@ -271,7 +271,7 @@ describe("agent-skill-evals check", () => {
     expect(result.diagnostics.map((item) => item.code)).not.toContain("routing.observation.unsupported");
   });
 
-  it("warns about underscore skill names under MCP delivery", async () => {
+  it("allows underscore skill names under MCP delivery (exact tool-name match, no normalization)", async () => {
     const root = makeProject();
     mkdirSync(join(root, "skills", "other_skill"), { recursive: true });
     writeFileSync(join(root, "skills", "other_skill", "SKILL.md"), "---\nname: other_skill\ndescription: Use when asked for other work. Do not use for demos.\n---\n");
@@ -287,7 +287,38 @@ describe("agent-skill-evals check", () => {
         "    distractor_skills: [../skills/other_skill]",
         "    expect:",
         "      - skill.loaded: { skills: [demo] }",
-        "      - skill.not_loaded: { skills: [other-skill] }",
+        "      - skill.not_loaded: { skills: [other_skill] }",
+      ].join("\n"),
+    );
+
+    const result = await checkSkillProject({
+      cwd: root,
+      skillPath: "./skills/demo",
+      testPackPath: "./tests/demo.yaml",
+    });
+
+    expect(result.diagnostics.map((item) => item.code)).not.toContain("skill.name.mcp_length");
+    expect(result.diagnostics.map((item) => item.code)).not.toContain("skill.name.reserved");
+  });
+
+  it("rejects skill names that exceed the MCP tool-name budget under MCP delivery", async () => {
+    const root = makeProject();
+    const longName = "a".repeat(52);
+    mkdirSync(join(root, "skills", longName), { recursive: true });
+    writeFileSync(join(root, "skills", longName, "SKILL.md"), `---\nname: ${longName}\ndescription: Use when asked for other work. Do not use for demos.\n---\n`);
+    writeFileSync(
+      join(root, "tests", "demo.yaml"),
+      [
+        "skill: ../skills/demo",
+        "skill_delivery: mcp",
+        "builtin_distractor: false",
+        "tests:",
+        "  - mode: routing",
+        "    prompt: Do the demo task",
+        `    distractor_skills: [../skills/${longName}]`,
+        "    expect:",
+        "      - skill.loaded: { skills: [demo] }",
+        `      - skill.not_loaded: { skills: [${longName}] }`,
       ].join("\n"),
     );
 
@@ -298,8 +329,40 @@ describe("agent-skill-evals check", () => {
     });
 
     expect(result.diagnostics).toContainEqual(expect.objectContaining({
-      code: "skill.name.underscore",
-      level: "warning",
+      code: "skill.name.mcp_length",
+      level: "error",
+    }));
+  });
+
+  it("rejects a skill named read_skill_file under MCP delivery", async () => {
+    const root = makeProject();
+    mkdirSync(join(root, "skills", "read_skill_file"), { recursive: true });
+    writeFileSync(join(root, "skills", "read_skill_file", "SKILL.md"), "---\nname: read_skill_file\ndescription: Use when asked. Do not use for demos.\n---\n");
+    writeFileSync(
+      join(root, "tests", "demo.yaml"),
+      [
+        "skill: ../skills/demo",
+        "skill_delivery: mcp",
+        "builtin_distractor: false",
+        "tests:",
+        "  - mode: routing",
+        "    prompt: Do the demo task",
+        "    distractor_skills: [../skills/read_skill_file]",
+        "    expect:",
+        "      - skill.loaded: { skills: [demo] }",
+        "      - skill.not_loaded: { skills: [read_skill_file] }",
+      ].join("\n"),
+    );
+
+    const result = await checkSkillProject({
+      cwd: root,
+      skillPath: "./skills/demo",
+      testPackPath: "./tests/demo.yaml",
+    });
+
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: "skill.name.reserved",
+      level: "error",
     }));
   });
 

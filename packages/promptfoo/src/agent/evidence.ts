@@ -17,6 +17,7 @@ import {
   type TurnRecord,
 } from "../evidence-schema.js";
 import type { SkillEvidenceConfig } from "./provider-config.js";
+import { RESERVED_SKILL_SERVER_MOCK_NAME } from "../test-pack.js";
 
 export type { EvidenceSnapshot };
 export type { SkillEvidenceConfig } from "./provider-config.js";
@@ -67,7 +68,8 @@ export class EvidenceCollector {
   addToolCall(e: ToolCallEvent): void {
     const event = this.withTurn(e);
     this.snapshot.toolCalls.push(event);
-    const skillLoad = skillLoadFromToolCall(event, this.skillEvidenceConfig);
+    const availableSkills = new Set(this.snapshot.skillsAvailable.map((skill) => skill.skill));
+    const skillLoad = skillLoadFromToolCall(event, this.skillEvidenceConfig, availableSkills);
     if (skillLoad) this.addSkillLoad(skillLoad);
   }
 
@@ -201,7 +203,23 @@ function mergeSkillEvidenceConfig(config: SkillEvidenceConfig): SkillEvidenceCon
 function skillLoadFromToolCall(
   event: ToolCallEvent,
   config: SkillEvidenceConfig,
+  availableSkills: ReadonlySet<string>,
 ): SkillLoadEvent | undefined {
+  // The built-in skill server registers each declared skill as a tool named
+  // exactly after the skill, so no pattern is needed there: match the tool
+  // name directly, but only against skills actually declared for this run
+  // (so an unrelated user MCP mock that happens to reuse the "skills" name
+  // outside MCP delivery can't be misread as a skill load).
+  if (event.server === RESERVED_SKILL_SERVER_MOCK_NAME && availableSkills.has(event.tool)) {
+    return {
+      skill: event.tool,
+      delivery: "mcp",
+      ...(event.provider ? { provider: event.provider } : {}),
+      server: event.server,
+      source: event.tool,
+      startedAt: event.startedAt,
+    };
+  }
   const uri = skillUriFromArgs(event.args, config.mcpResource?.uriArgPaths ?? []);
   const skill = uri
     ? skillFromPattern(uri, config.mcpResource?.uriPatterns ?? [])

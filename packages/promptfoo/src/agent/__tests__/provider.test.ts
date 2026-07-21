@@ -606,7 +606,7 @@ describe("AgentSkillEvalsProvider with skill_delivery: mcp", () => {
 
     expect(response.error).toBeUndefined();
     expect(response.output).toBe(
-      'Load the "demo" skill by calling the load_demo_skill tool on the "skills" MCP server, then follow its instructions.\n\nDo the demo work.',
+      'Load the "demo" skill by calling the demo tool on the "skills" MCP server, then follow its instructions.\n\nDo the demo work.',
     );
   });
 
@@ -615,7 +615,7 @@ describe("AgentSkillEvalsProvider with skill_delivery: mcp", () => {
     writeFileSync(
       agent,
       [
-        "console.log(JSON.stringify({ type: 'item.completed', item: { type: 'mcp_tool_call', server: 'skills', tool: 'load_demo_skill', arguments: {}, result: 'ok' } }));",
+        "console.log(JSON.stringify({ type: 'item.completed', item: { type: 'mcp_tool_call', server: 'skills', tool: 'demo', arguments: {}, result: 'ok' } }));",
         "console.log(JSON.stringify({ type: 'agent_message', message: 'done' }));",
       ].join("\n"),
     );

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { buildSkillServer, scanSkills, SKILL_SERVER_NAME } from "../server.js";
+import { buildSkillServer, scanSkills, SKILL_SERVER_NAME, MAX_SKILL_NAME_LENGTH, READ_SKILL_FILE_TOOL_NAME } from "../server.js";
 
 let dir: string;
 let demoDir: string;
@@ -64,22 +64,42 @@ describe("scanSkills", () => {
   it("rejects duplicate skill names", async () => {
     await expect(scanSkills([demoDir, demoDir])).rejects.toThrow(/duplicate skill name/);
   });
+
+  it("rejects skill names that would blow the mcp__skills__<name> tool-name budget", async () => {
+    const longName = "a".repeat(MAX_SKILL_NAME_LENGTH + 1);
+    const longDir = join(dir, longName);
+    mkdirSync(longDir, { recursive: true });
+    writeFileSync(join(longDir, "SKILL.md"), "---\nname: long\ndescription: Use for long names.\n---\n");
+    await expect(scanSkills([longDir])).rejects.toThrow(/64-character limit/);
+
+    const okDir = join(dir, "a".repeat(MAX_SKILL_NAME_LENGTH));
+    mkdirSync(okDir, { recursive: true });
+    writeFileSync(join(okDir, "SKILL.md"), "---\nname: ok\ndescription: Use for ok names.\n---\n");
+    await expect(scanSkills([okDir])).resolves.toHaveLength(1);
+  });
+
+  it("rejects a skill named after the reserved read_skill_file tool", async () => {
+    const reservedDir = join(dir, READ_SKILL_FILE_TOOL_NAME);
+    mkdirSync(reservedDir, { recursive: true });
+    writeFileSync(join(reservedDir, "SKILL.md"), "---\nname: reserved\ndescription: Use for reserved names.\n---\n");
+    await expect(scanSkills([reservedDir])).rejects.toThrow(/reserved/);
+  });
 });
 
 describe("buildSkillServer", () => {
-  it("exposes a load_<name>_skill tool per skill with the frontmatter description", async () => {
+  it("exposes a tool named after each skill, described by its frontmatter", async () => {
     const client = await connectedClient([demoDir, plainDir]);
     const tools = await client.listTools();
     const names = tools.tools.map((tool) => tool.name).sort();
-    expect(names).toEqual(["load_demo_skill", "load_plain_skill", "read_skill_file"]);
-    const demo = tools.tools.find((tool) => tool.name === "load_demo_skill");
+    expect(names).toEqual(["demo", "plain", "read_skill_file"]);
+    const demo = tools.tools.find((tool) => tool.name === "demo");
     expect(demo?.description).toMatch(/^Use when the user asks for the demo workflow/);
     await client.close();
   });
 
-  it("returns SKILL.md plus a file listing from the load tool", async () => {
+  it("returns SKILL.md plus a file listing from the skill's tool", async () => {
     const client = await connectedClient([demoDir]);
-    const result = await client.callTool({ name: "load_demo_skill", arguments: {} });
+    const result = await client.callTool({ name: "demo", arguments: {} });
     const text = (result.content as Array<{ type: string; text: string }>)[0]!.text;
     expect(text).toContain("# demo");
     expect(text).toContain("skill://demo/reference/notes.md");
@@ -156,7 +176,7 @@ describe("skill-server executable", () => {
       send({ jsonrpc: "2.0", id: 2, method: "tools/list" });
       const tools = await waitFor(2);
       const names = (tools.result as { tools: Array<{ name: string }> }).tools.map((tool) => tool.name);
-      expect(names).toContain("load_demo_skill");
+      expect(names).toContain("demo");
     } finally {
       child.kill();
     }
