@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /** Agent Skill Evals owns setup and static checks; Promptfoo owns runtime evals. */
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { AGENT_PRESETS, PRESET_IDS } from "../agent/presets.js";
-import { checkSkillProject } from "../skill-checks/check.js";
+import { checkSkillProject, type DiagnosticLevel } from "../skill-checks/check.js";
 
 export interface InitOptions {
   dir?: string;
@@ -124,6 +124,26 @@ const USAGE = `Usage:
 Static checks are local and agent-free. Runtime evaluations continue to use promptfoo eval.
 `;
 
+function packageVersion(): string {
+  try {
+    const raw = readFileSync(new URL("../../package.json", import.meta.url), "utf8");
+    const version = (JSON.parse(raw) as { version?: unknown }).version;
+    return typeof version === "string" ? version : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+function summarizeDiagnostics(diagnostics: ReadonlyArray<{ level: DiagnosticLevel }>): string {
+  const errors = diagnostics.filter((item) => item.level === "error").length;
+  const warnings = diagnostics.filter((item) => item.level === "warning").length;
+  const parts = [
+    ...(errors > 0 ? [`${errors} error${errors === 1 ? "" : "s"}`] : []),
+    ...(warnings > 0 ? [`${warnings} warning${warnings === 1 ? "" : "s"}`] : []),
+  ];
+  return parts.length > 0 ? ` (${parts.join(", ")})` : "";
+}
+
 export async function main(
   argv: string[] = process.argv.slice(2),
   io: CliIo = {
@@ -133,6 +153,14 @@ export async function main(
   },
 ): Promise<number> {
   const command = argv[0];
+  if (command === "help" || command === "--help" || command === "-h") {
+    io.stdout(USAGE);
+    return 0;
+  }
+  if (command === "--version" || command === "-v") {
+    io.stdout(`${packageVersion()}\n`);
+    return 0;
+  }
   if (command === "check") {
     const skillPath = argv[1];
     if (!skillPath || skillPath.startsWith("-")) {
@@ -149,11 +177,12 @@ export async function main(
       io.stdout(`${JSON.stringify(result, null, 2)}\n`);
     } else {
       for (const item of result.diagnostics) {
-        const target = item.path ? ` (${item.path})` : "";
+        const target = item.path && !item.message.includes(item.path) ? ` (${item.path})` : "";
         io.stdout(`${item.level.toUpperCase()} ${item.code}: ${item.message}${target}\n`);
         if (item.suggestion) io.stdout(`  Fix: ${item.suggestion}\n`);
       }
-      io.stdout(result.ok ? "Skill checks passed.\n" : "Skill checks failed.\n");
+      const summary = summarizeDiagnostics(result.diagnostics);
+      io.stdout(result.ok ? `Skill checks passed${summary}.\n` : `Skill checks failed${summary}.\n`);
     }
     return result.ok ? 0 : 1;
   }
@@ -174,6 +203,12 @@ export async function main(
   for (const error of result.errors) io.stderr(`error: ${error}\n`);
   if (result.created.length > 0) {
     const skill = optionValue(argv, "--skill") ?? "./skills/my-skill";
+    const skillMd = join(resolve(optionValue(argv, "--dir") ?? io.cwd, skill), "SKILL.md");
+    if (!existsSync(skillMd)) {
+      io.stdout(
+        `\nnote: ${skill} does not exist yet. Create ${skill}/SKILL.md (with name and description frontmatter) before running check.\n`,
+      );
+    }
     io.stdout(
       "\nNext steps:\n" +
         `  1. pnpm exec agent-skill-evals check ${skill}\n` +

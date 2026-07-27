@@ -32,6 +32,13 @@ const cleanPack = {
       distractor_skills: ["./skills/brand-deck"],
       expect: [{ "skill.loaded": { skills: ["bugfix-workflow"] } }],
     },
+    {
+      description: "documents the unaided outcome",
+      mode: "baseline",
+      prompt: "Fix the redirect.",
+      fixture: "./fixtures/login-bug",
+      expect: [{ "verifier.fails": { run: "./verify.sh" } }],
+    },
   ],
 };
 

@@ -67,7 +67,8 @@ export class EvidenceCollector {
   addToolCall(e: ToolCallEvent): void {
     const event = this.withTurn(e);
     this.snapshot.toolCalls.push(event);
-    const skillLoad = skillLoadFromToolCall(event, this.skillEvidenceConfig);
+    const skillLoad = skillLoadFromToolCall(event, this.skillEvidenceConfig) ??
+      nativeSkillLoadFromToolCall(event);
     if (skillLoad) this.addSkillLoad(skillLoad);
   }
 
@@ -216,6 +217,45 @@ function skillLoadFromToolCall(
     source: event.tool,
     startedAt: event.startedAt,
   };
+}
+
+/**
+ * Native load evidence: the agent read a SKILL.md out of one of the skill
+ * directories the harness installed into the World (.agents/skills or
+ * .claude/skills). The read shows up as a normalized tool call whose args
+ * reference the path — a Read/file tool arg, or a shell command string.
+ */
+const NATIVE_SKILL_MD_RE = /(?:\.agents|\.claude)[\\/]skills[\\/]([A-Za-z0-9._-]+)[\\/]SKILL\.md/;
+
+function nativeSkillLoadFromToolCall(event: ToolCallEvent): SkillLoadEvent | undefined {
+  const skill = findNativeSkillReference(event.args);
+  if (!skill) return undefined;
+  return {
+    skill,
+    delivery: "native",
+    ...(event.provider ? { provider: event.provider } : {}),
+    source: event.tool,
+    startedAt: event.startedAt,
+  };
+}
+
+function findNativeSkillReference(value: unknown, depth = 0): string | undefined {
+  if (depth > 4) return undefined;
+  if (typeof value === "string") return NATIVE_SKILL_MD_RE.exec(value)?.[1];
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const skill = findNativeSkillReference(item, depth + 1);
+      if (skill) return skill;
+    }
+    return undefined;
+  }
+  if (value && typeof value === "object") {
+    for (const item of Object.values(value)) {
+      const skill = findNativeSkillReference(item, depth + 1);
+      if (skill) return skill;
+    }
+  }
+  return undefined;
 }
 
 function skillUriFromArgs(args: unknown, paths: readonly string[]): string | undefined {

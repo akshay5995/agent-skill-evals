@@ -98,6 +98,9 @@ async function declaredSkills(input: {
   vars: Record<string, unknown>;
   baseDir: string;
 }): Promise<DeclaredSkill[]> {
+  // Baseline cases measure the agent unaided: no skills are installed, so
+  // the World shows what the agent does without the skill under test.
+  if (input.vars.mode === "baseline") return [];
   const target = input.vars.skillPath;
   if (typeof target !== "string" || target.length === 0) return [];
   const skills: DeclaredSkill[] = [{

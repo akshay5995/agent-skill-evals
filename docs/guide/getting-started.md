@@ -47,4 +47,6 @@ tests:
 
 The exact budget should come from a real passing run; the value above is only an example. Evidence records output, file writes, commands, tool calls, available and loaded skills, usage, turns, runtime identity, and adapter warnings.
 
+Agent output is nondeterministic, so don't trust one lucky pass: once a case is green, run `pnpm exec promptfoo eval --repeat 3` and judge the distribution. Three to five trials per case is a good default.
+
 For file edits, verifiers, mocks, and multi-turn cases, use the repository's [cross-adapter example](https://github.com/akshay5995/agent-skill-evals/tree/main/examples).

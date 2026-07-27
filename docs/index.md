@@ -27,7 +27,7 @@ features:
 ---
 
 ::: tip Promptfoo is the test runner
-[Promptfoo](https://www.promptfoo.dev/) is an open-source eval framework. Agent Skill Evals plugs into normal Promptfoo configs, so you keep running `promptfoo eval` and add skill-specific checks. Use the [Promptfoo docs](https://www.promptfoo.dev/docs/intro/) for Promptfoo's own config reference.
+[Promptfoo](https://www.promptfoo.dev/) is an open-source eval framework. Agent Skill Evals is the skill-testing layer for real agent CLIs on top of it — isolated Worlds, verifier-backed evidence, static checks, and token budgets. You keep running `promptfoo eval`; use the [Promptfoo docs](https://www.promptfoo.dev/docs/intro/) for Promptfoo's own config reference.
 :::
 
 ## How It Works

@@ -22,6 +22,7 @@ export default defineConfig({
     nav: [
       { text: "Start", link: "/guide/getting-started" },
       { text: "Reference", link: "/guide/reference" },
+      { text: "Why Evaluate Skills?", link: "/blog/evaluating-agent-skills" },
     ],
     sidebar: [
       {
@@ -30,6 +31,7 @@ export default defineConfig({
           { text: "Overview", link: "/" },
           { text: "Getting Started", link: "/guide/getting-started" },
           { text: "Reference", link: "/guide/reference" },
+          { text: "Why Evaluate Skills?", link: "/blog/evaluating-agent-skills" },
         ],
       },
     ],

@@ -1,6 +1,6 @@
 {
   "name": "agent-skill-evals",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "type": "module",
   "exports": {
     "./agent": {
@@ -35,7 +35,7 @@
     "tsx": "^4.22.0",
     "typescript": "^5.6.2"
   },
-  "description": "Promptfoo-native core package for evaluating reusable agent skills.",
+  "description": "Test agent skills with real agent CLIs: isolated Worlds, verifier-backed evidence, static checks, and token budgets on top of Promptfoo.",
   "license": "MIT",
   "repository": {
     "type": "git",

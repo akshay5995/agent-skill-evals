@@ -64,6 +64,10 @@ async function resolveSkillMd(path: string): Promise<string> {
   return join(path, "SKILL.md");
 }
 
+function isMissingFile(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException | null)?.code === "ENOENT";
+}
+
 function diagnostic(
   level: DiagnosticLevel,
   code: string,
@@ -197,7 +201,6 @@ async function checkCase(
   for (const mock of [...(pack.environment?.mocks ?? []), ...(test.environment?.mocks ?? [])]) {
     out.push(...await checkMock(mock, packDir));
   }
-  const mocks = [...(pack.environment?.mocks ?? []), ...(test.environment?.mocks ?? [])];
   const expectedChecks = test.expect.map(checkName);
   if (test.mode === "routing" && !expectedChecks.includes("skill.loaded")) {
     out.push(diagnostic("error", "routing.skill_loaded.required", "Routing Tests must prove that the target skill was loaded."));
@@ -209,17 +212,17 @@ async function checkCase(
   if (test.mode === "routing" && hasDistractors && !expectedChecks.includes("skill.not_loaded")) {
     out.push(diagnostic("error", "routing.skill_not_loaded.required", "Routing Tests with distractors must prove that unrelated skills were not loaded."));
   }
-  const hasSkillEvidence = mocks.some(
-    (mock) => mock.kind === "mcp" && mock.provides_skill_evidence,
-  );
-  if (test.mode === "routing" && expectedChecks.includes("skill.loaded") && !hasSkillEvidence) {
-    out.push(diagnostic(
-      "error",
-      "routing.observation.unsupported",
-      "Native skill discovery does not currently expose trustworthy load evidence for routing assertions.",
-      undefined,
-      "Add an MCP boundary that emits observable skill-load telemetry and set provides_skill_evidence: true.",
-    ));
+  if (test.mode === "baseline") {
+    const skillChecks = expectedChecks.filter((name) => name === "skill.loaded" || name === "skill.not_loaded");
+    if (skillChecks.length > 0) {
+      out.push(diagnostic(
+        "error",
+        "baseline.skill_checks.invalid",
+        "Baseline cases run without any skills installed, so skill.loaded and skill.not_loaded prove nothing there.",
+        undefined,
+        "Assert the unaided outcome instead (for example verifier.fails or a budget), and keep skill checks in behavior or routing cases.",
+      ));
+    }
   }
   if (!test.budget) {
     out.push(diagnostic("warning", "budget.missing", `Test "${test.description ?? test.prompt}" has no token budget.`, undefined, "Add a budget after observing a representative passing run."));
@@ -244,14 +247,18 @@ export async function checkSkillProject(
     skill = await parseSkillMd(skillMd);
     diagnostics.push(...checkSkillQuality(skill));
   } catch (error) {
-    diagnostics.push(diagnostic("error", "skill.read", `Could not read SKILL.md: ${error instanceof Error ? error.message : String(error)}`, skillMd));
+    diagnostics.push(isMissingFile(error)
+      ? diagnostic("error", "skill.read", `No SKILL.md found at ${skillMd}.`, skillMd, "Pass the skill directory that contains SKILL.md, or create one with name and description frontmatter.")
+      : diagnostic("error", "skill.read", `Could not read SKILL.md: ${error instanceof Error ? error.message : String(error)}`, skillMd));
   }
 
   let pack: CleanTestPack | undefined;
   try {
     pack = await loadTestPack(testPack);
   } catch (error) {
-    diagnostics.push(diagnostic("error", "test_pack.read", error instanceof Error ? error.message : String(error), testPack));
+    diagnostics.push(isMissingFile(error)
+      ? diagnostic("error", "test_pack.read", `No Test Pack found at ${testPack}.`, testPack, `Run agent-skill-evals init --skill ${options.skillPath} to scaffold one, or point at an existing pack with --tests.`)
+      : diagnostic("error", "test_pack.read", error instanceof Error ? error.message : String(error), testPack));
   }
 
   if (pack) {

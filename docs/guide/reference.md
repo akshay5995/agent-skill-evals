@@ -2,8 +2,9 @@
 
 ## Commands
 
-- `agent-skill-evals init --skill <path> --adapter <codex|claude-code|pi> [--dir <path>] [--force]` creates the minimal Promptfoo workspace. Existing files are skipped unless `--force` is set.
-- `agent-skill-evals check <skill> [--tests <pack>] [--strict] [--json]` validates the skill and Test Pack without running an agent. It defaults to `tests/<skill-name>.yaml`; `--strict` turns warnings into failures.
+- `agent-skill-evals init --skill <path> --adapter <codex|claude-code|pi> [--dir <path>] [--force]` creates the minimal Promptfoo workspace. Existing files are skipped unless `--force` is set. When the skill directory does not exist yet, `init` still scaffolds and prints a note to create `SKILL.md` first.
+- `agent-skill-evals check <skill> [--tests <pack>] [--strict] [--json]` validates the skill and Test Pack without running an agent. It defaults to `tests/<skill-name>.yaml`; `--strict` turns warnings into failures. The final line summarizes error and warning counts.
+- `agent-skill-evals help` (or `--help`) prints usage; `--version` prints the installed version.
 - `promptfoo eval` owns runtime execution, filtering, repetition, caching, output, and the web UI.
 
 ## Test Pack
@@ -21,13 +22,20 @@ Paths are relative to the Test Pack. Every case requires one non-empty `expect` 
 
 The required top-level fields are `skill` and `tests`. Optional shared fields are `supporting_skills`, `distractor_skills`, `builtin_distractor`, and `environment`.
 
-Each case requires `prompt` and `expect`. Optional fields are `description`, `mode`, `fixture`, `setup`, `supporting_skills`, `distractor_skills`, `preconditions`, `conversation`, `environment`, `budget`, `promptfoo.assert`, and `metadata`. Case-level `supporting_skills` replace the shared list when present; case-level distractors and mocks are added to their shared lists. `setup` contains shell commands that run inside the World before preconditions; a non-zero exit stops the case.
+Each case requires `prompt` and `expect`. Optional fields are `description`, `mode`, `fixture`, `setup`, `supporting_skills`, `distractor_skills`, `preconditions`, `conversation`, `environment`, `budget`, `promptfoo.assert`, and `metadata`. `mode` is `behavior` (default), `routing`, or `baseline`. Case-level `supporting_skills` replace the shared list when present; case-level distractors and mocks are added to their shared lists. `setup` contains shell commands that run inside the World before preconditions; a non-zero exit stops the case.
 
 Use `promptfoo.assert` for native Promptfoo assertions such as `llm-rubric` when the result is present in final output and deterministic evidence cannot prove semantic quality. These assertions pass through to Promptfoo and may require a grading provider; keep file and tool guarantees in `expect`.
 
 ## Worlds and skills
 
-Every case receives a fresh World and an isolated skill set. Behavior cases explicitly invoke the target skill and include any supporting skills. Routing cases expose the target and declared distractors; when `builtin_distractor` is omitted, it defaults to `true` and adds a generated neutral distractor. Set it to `false` to use only explicit distractors. Routing still requires observed load evidence; availability never proves use.
+Every case receives a fresh World and an isolated skill set. Behavior cases explicitly invoke the target skill and include any supporting skills. Routing cases expose the target and declared distractors; when `builtin_distractor` is omitted, it defaults to `true` and adds a generated neutral distractor. Set it to `false` to use only explicit distractors.
+
+Baseline cases install no skills at all: the agent runs the same prompt and fixture unaided, so you can prove the skill is what makes the difference. Pair a baseline case with a behavior case — for a task the agent cannot complete without the skill, assert `verifier.fails` in the baseline; for efficiency lift, compare turns and token usage between the two cases in Promptfoo's results. Skill checks (`skill.loaded`, `skill.not_loaded`) are rejected in baseline cases because they prove nothing there.
+
+Routing requires observed load evidence; availability never proves use. Two kinds of evidence are accepted:
+
+- **Native** — the agent read the installed skill's `SKILL.md` (observed as a tool call referencing `.agents/skills/<name>/SKILL.md` or `.claude/skills/<name>/SKILL.md`). This is the default and needs no extra setup.
+- **MCP** — an MCP boundary with `provides_skill_evidence: true` emits explicit load telemetry. This is the strongest evidence; require it with `skill.loaded: { skills: [name], delivery: mcp }` when you need it.
 
 Agent CLIs receive an isolated home, but the selected CLI must already be installed and authenticated. Follow the official setup for [Codex CLI](https://help.openai.com/en/articles/11096431), [Claude Code](https://docs.anthropic.com/en/docs/claude-code/getting-started), or [Pi](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/quickstart.md). For non-interactive Claude evals, export `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token` or use `ANTHROPIC_API_KEY`.
 
