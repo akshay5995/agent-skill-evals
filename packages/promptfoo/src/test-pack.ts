@@ -85,7 +85,7 @@ const PromptfooAssertionSchema = z.record(z.string(), z.unknown());
 
 export const CleanTestCaseSchema = z.object({
   description: z.string().optional(),
-  mode: z.enum(["behavior", "routing"]).default("behavior"),
+  mode: z.enum(["behavior", "routing", "baseline"]).default("behavior"),
   prompt: NonEmptyString,
   fixture: NonEmptyString.optional(),
   setup: z.array(NonEmptyString).default([]),

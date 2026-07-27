@@ -10,6 +10,8 @@ Test whether reusable instructions for AI agents actually work.
 
 An agent skill is a reusable playbook that tells an AI agent how to perform a task. Agent Skill Evals lets you give that skill realistic jobs, run them with real agents, and verify what actually happened. Unlike general model or application evals, the skill itself is the product under test.
 
+Agent Skill Evals is the skill-testing layer for real agent CLIs: isolated Worlds, verifier-backed evidence, static checks, and token budgets on top of Promptfoo. It proves a skill works; it does not audit a skill for malicious content — review third-party skills before running them, even in isolation.
+
 Agent Skill Evals gives [Promptfoo](https://www.promptfoo.dev/) the skill-aware setup, static checks, isolated test environments, and runtime assertions needed to answer two questions:
 
 1. Is the skill clear and testable before an agent runs?
@@ -96,6 +98,7 @@ There is no second eval runner and no private-intent inference. Routing tests mu
 
 ## Documentation
 
+- [Why Evaluate Skills?](./docs/blog/evaluating-agent-skills.md) explains the problems with how skills are tested today and how this project solves them.
 - [Getting Started](./docs/guide/getting-started.md) walks through the first working eval.
 - [Reference](./docs/guide/reference.md) covers Test Packs, Worlds, role play, mocks, runtime checks, evidence, and budgets.
 - [Runnable examples](./examples) exercise the same Test Pack across Codex, Claude Code, and Pi.

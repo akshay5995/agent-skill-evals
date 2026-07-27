@@ -217,7 +217,7 @@ describe("agent-skill-evals check", () => {
     }));
   });
 
-  it("requires MCP mocks to declare skill-load evidence", async () => {
+  it("accepts routing tests without MCP telemetry mocks (native load evidence)", async () => {
     const root = makeProject();
     writeFileSync(
       join(root, "tests", "demo.yaml"),
@@ -226,9 +226,6 @@ describe("agent-skill-evals check", () => {
         "tests:",
         "  - mode: routing",
         "    prompt: Do the demo task",
-        "    environment:",
-        "      mocks:",
-        "        - { kind: mcp, name: crm, transport: http, url: http://localhost }",
         "    expect:",
         "      - skill.loaded: { skills: [demo] }",
         "      - skill.not_loaded: { skills: [agent-skill-evals-neutral] }",
@@ -241,9 +238,7 @@ describe("agent-skill-evals check", () => {
       testPackPath: "./tests/demo.yaml",
     });
 
-    expect(result.diagnostics).toContainEqual(expect.objectContaining({
-      code: "routing.observation.unsupported",
-    }));
+    expect(result.diagnostics.filter((item) => item.level === "error")).toEqual([]);
   });
 
   it("checks absolute mock file paths", async () => {
@@ -300,5 +295,69 @@ describe("agent-skill-evals check", () => {
     expect(result.diagnostics).not.toContainEqual(expect.objectContaining({
       code: "mock.file.missing",
     }));
+  });
+
+  it("rejects skill checks in baseline cases and accepts unaided-outcome checks", async () => {
+    const root = makeProject();
+    writeFileSync(
+      join(root, "tests", "demo.yaml"),
+      [
+        "skill: ../skills/demo",
+        "tests:",
+        "  - mode: baseline",
+        "    prompt: Do the demo task",
+        "    fixture: ../fixtures/demo",
+        "    expect:",
+        "      - skill.not_loaded: { skills: [demo] }",
+        "  - mode: baseline",
+        "    prompt: Do the demo task",
+        "    fixture: ../fixtures/demo",
+        "    expect:",
+        "      - verifier.fails: { run: ./verify.sh }",
+      ].join("\n"),
+    );
+
+    const result = await checkSkillProject({
+      cwd: root,
+      skillPath: "./skills/demo",
+      testPackPath: "./tests/demo.yaml",
+    });
+
+    const baselineErrors = result.diagnostics.filter((item) => item.code === "baseline.skill_checks.invalid");
+    expect(baselineErrors).toHaveLength(1);
+    expect(result.ok).toBe(false);
+  });
+
+  it("explains how to fix a missing SKILL.md and Test Pack instead of raw ENOENT", async () => {
+    const root = mkdtempSync(join(tmpdir(), "agent-skill-evals-check-empty-"));
+    const result = await checkSkillProject({
+      cwd: root,
+      skillPath: "./skills/missing",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: "skill.read",
+      message: expect.stringContaining("No SKILL.md found at"),
+      suggestion: expect.stringContaining("SKILL.md"),
+    }));
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: "test_pack.read",
+      message: expect.stringContaining("No Test Pack found at"),
+      suggestion: expect.stringContaining("agent-skill-evals init --skill ./skills/missing"),
+    }));
+    expect(result.diagnostics.map((item) => item.message).join("\n")).not.toContain("ENOENT");
+  });
+
+  it("summarizes error and warning counts in CLI output", async () => {
+    const root = makeProject();
+    const stdout: string[] = [];
+    const exitCode = await main(
+      ["check", "./skills/demo", "--tests", "./tests/demo.yaml"],
+      { cwd: root, stdout: (text) => stdout.push(text), stderr: () => undefined },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stdout.join("")).toMatch(/Skill checks passed \(\d+ warnings?\)\./);
   });
 });
